@@ -1,0 +1,30 @@
+# RateMyDoctor
+- Proposed features:
+	- Rate Hospitals
+	- Subcategory scores
+	- Comment based feedback
+	- Doctors can respond to user comments
+	- Group Doctors by hospital
+	- Group by procedure (Might be out of scope)
+	- Search for doctor/hosptial
+	- Distance based filtering
+- User-Access-Roles:
+	- User
+		- View & Leave Reviews
+		- Access non-user location data
+	- Doctor/Hospital
+		- Request audit of review
+		- Respond to reviews
+	- Admin
+		- Verify status of a doctor
+		- Moderate reviews
+- Project Roles
+	- All members will work on the backend where relavant
+	- @adrianaprz13
+		- UI-UX
+	- @hoangdung-nguyen 
+		- Data Collections
+	- @AbyssalNewt
+		- Database Managent
+- Note:
+	- App may change to "Rate my Hospital" depending on the difficulty of data management with different API's
