@@ -17,6 +17,7 @@ class Session:
 
     def __init__(self):
         self.driver = GraphDatabase.driver(URI, auth=AUTH)
+            #Driver is known to be expensive, use as few as possible
         self.auth = None
 
     def login(self, username, password):
@@ -32,16 +33,17 @@ class Session:
             return False
         records, summary, keys = self.driver.execute_query(query, auth_=self.auth, **kwargs)
         return records
-
+    
     @staticmethod
     def _giveUuid(td):
-        return (td.update({'uuid':uuid()}))
+        td.update({'uuid':uuid()})
+        return td
 
     def createUser(self, login:UserLogin):
         try:
             #Create user in the DMBS
             self.driver.execute_query("""\
-                    CREATE USER $username\
+                    CREATE USER $username
                     SET PASSWORD '$password' CHANGE NOT REQUIRED""",
                 **login)
 
@@ -78,5 +80,5 @@ if __name__ == '__main__':
     s._deleteUser('test')
     rec = s._query("""MATCH (u:User {username: 'test'})\
             RETURN u.username AS name""")
-    s.createHospital({'name':'tmh','address':'aaa lane','zip':32304})
+    s.createHospital(Hospital({'name':'tmh','address':'aaa lane','zip':32304}))
     print(rec)
