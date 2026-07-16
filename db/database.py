@@ -43,9 +43,7 @@ def _giveId(name:str) -> str:
     return f"ON CREATE SET {name}.uuid = '{uuid()}'"
 
 class Session:
-    """
-    API for interacting with a neo4j database.
-    """
+    """An API for interacting with a neo4j database."""
 
     def __init__(self, login=None, host=HOST, port=PORT, driverAuth=AUTH):
         self.driver = GraphDatabase.driver(f'neo4j://{host}:{port}', auth=driverAuth)
@@ -67,11 +65,6 @@ class Session:
             return False
         records, summary, keys = self.driver.execute_query(query, auth_=self.auth, **kwargs)
         return records
-    
-    @staticmethod
-    def _giveUuid(td):
-        td.update({'uuid':uuid()})
-        return td
 
     def _abRelMerge(self, alab:str, adic:dict, blab:str, bdic:dict, rlab:str):
         """Creates if not exist nodes a, b, and the relation (a)->[:rlab]->(b)"""
@@ -107,24 +100,11 @@ class Session:
                 CREATE (:User {username: $username})""",
                 username=login['username'])
 
-    def _deleteUser(self, username):
+    def deleteUser(self, username):
         self._query("""DROP USER $user IF EXISTS""", user=username)
         self._query("""MATCH (u:User {username: $user})\
                     DETACH DELETE u""", user=username)
 
-    def createHospital(self, h:Hospital):
-        self._query("""CREATE (:Hospital {})""".format(self._giveUuid(h)))
-
-    def createReview(self, score, content, username, uuid):
-        r = locals(); r.pop('self')
-        h = r.popitem()
-        u = r.popitem()
-        self._query("""MATCH (h:Hospital|Doctor {}),
-                             (u:User {}),
-                    CREATE (r:Review {}),
-                    (u)-[:Authored]->(r),
-                    (r)-[:Targeted]->h"""
-                              .format(h,u,r))
     def _importDoctor(self, docd, hosd):
         return self._abRelMerge('Doctor', docd, 'Hospital', hosd, WORKS_AT)
 
