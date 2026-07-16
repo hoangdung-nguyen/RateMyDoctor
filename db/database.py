@@ -11,6 +11,34 @@ AUTH = ('neo4j', 'password') #Needs to only have user creation perms after setup
 
 URI = f'neo4j://{HOST}:{PORT}'
 
+def _dictQuery(d:dict, name:str="") -> tuple[str,dict]:
+    """Formats a dict as a string compatible with neo4j queries.
+
+    Also returns a dict to be passed to kwargs in a _query to maintain
+    typing."""
+
+    string = "{" + ''.join([f", {k}: ${name+k}" for k,v in d.items()])
+    string = string.replace(", ", "", 1) + '}'   #Gets rid of first comma
+
+    values = {name+k:v for k,v in d.items()}    #replacement dict for _query
+    return (string, values)
+
+def _labelQuery(name:str, d:dict, labels:str|list, op='') -> tuple[str,dict]:
+    """Formats a dict, label, and neo4j variable into a query line.
+
+    Also returns a dict to be passed to kwargs in a _query to maintain
+    typing."""
+
+    if type(labels) is not list:
+        labels = [labels]
+
+    string, values = _dictQuery(d, name)
+    string = (f'{op} ({name}:{':'.join([l for l in labels])} {string})')
+    return (string, values)
+
+def _giveId(name:str) -> str:
+    return f"ON CREATE SET {name}.uuid = '{uuid()}'"
+
 class Session:
     """
     API for interacting with a neo4j database.
