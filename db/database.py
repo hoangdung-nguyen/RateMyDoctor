@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 from neo4j import GraphDatabase
 from uuid import uuid4 as uuid
-from schema import *
 
 HOST = 'localhost'
 PORT = '7687'
+AUTH = ('neo4j', 'password') # !!!Needs to only have user creation perms after setup!!!
+URI = f'neo4j://{HOST}:{PORT}'
 
 AUTH = ('neo4j', 'password') #Needs to only have user creation perms after setup
 
@@ -15,10 +16,12 @@ class Session:
     API for interacting with a neo4j database.
     """
 
-    def __init__(self):
-        self.driver = GraphDatabase.driver(URI, auth=AUTH)
+    def __init__(self, login=None, host=HOST, port=PORT, driverAuth=AUTH):
+        self.driver = GraphDatabase.driver(f'neo4j://{host}:{port}', auth=driverAuth)
             #Driver is known to be expensive, use as few as possible
         self.auth = None
+        if login is not None:
+            self.login(*login)
 
     def login(self, username, password):
         self.auth = (username, password)
