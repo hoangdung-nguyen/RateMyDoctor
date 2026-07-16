@@ -14,11 +14,14 @@ MERGE = 'MERGE'
 
 WORKS_AT= 'Works_At'
 
-def _dictQuery(d:dict, name:str="") -> tuple[str,dict]:
+def _dictQuery(name:str='', d:dict|None=None) -> tuple[str,dict]:
     """Formats a dict as a string compatible with neo4j queries.
 
     Also returns a dict to be passed to kwargs in a _query to maintain
     typing."""
+    
+    if d == None or len(d) == 0:
+        return ("",{})
 
     string = "{" + ''.join([f", {k}: ${name+k}" for k,v in d.items()])
     string = string.replace(", ", "", 1) + '}'   #Gets rid of first comma
@@ -26,7 +29,7 @@ def _dictQuery(d:dict, name:str="") -> tuple[str,dict]:
     values = {name+k:v for k,v in d.items()}    #replacement dict for _query
     return (string, values)
 
-def _labelQuery(name:str, d:dict, labels:str|list, op='') -> tuple[str,dict]:
+def _labelQuery(labels:str|list, name:str = '', d:dict|None = None, op='') -> tuple[str,dict]:
     """Formats a dict, label, and neo4j variable into a query line.
 
     Also returns a dict to be passed to kwargs in a _query to maintain
@@ -35,7 +38,7 @@ def _labelQuery(name:str, d:dict, labels:str|list, op='') -> tuple[str,dict]:
     if type(labels) is not list:
         labels = [labels]
 
-    string, values = _dictQuery(d, name)
+    string, values = _dictQuery(name, d)
     string = (f'{op} ({name}:{':'.join([l for l in labels])} {string})')
     return (string, values)
 
