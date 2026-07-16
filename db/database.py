@@ -7,9 +7,12 @@ PORT = '7687'
 AUTH = ('neo4j', 'password') # !!!Needs to only have user creation perms after setup!!!
 URI = f'neo4j://{HOST}:{PORT}'
 
-AUTH = ('neo4j', 'password') #Needs to only have user creation perms after setup
+A = 'a'
+B = 'b'
+R = 'r'
+MERGE = 'MERGE'
 
-URI = f'neo4j://{HOST}:{PORT}'
+WORKS_AT= 'Works_At'
 
 def _dictQuery(d:dict, name:str="") -> tuple[str,dict]:
     """Formats a dict as a string compatible with neo4j queries.
@@ -70,7 +73,25 @@ class Session:
         td.update({'uuid':uuid()})
         return td
 
-    def createUser(self, login:UserLogin):
+    def _abRelMerge(self, alab:str, adic:dict, blab:str, bdic:dict, rlab:str):
+        """Creates if not exist nodes a, b, and the relation (a)->[:rlab]->(b)"""
+
+        query, values = "", {}
+        a, b = (A,adic,alab),(B,bdic,blab)
+
+        for var in (a,b):
+            print(var)
+            s,v = _labelQuery(*var, MERGE)
+            query = '\n'.join([query, s, _giveId(var[0])])
+            values = values | v
+
+        query = '\n'.join([query,
+                   f'MERGE ({A})-[{R}:{rlab}]->({B})', f'RETURN {A},{R},{B}'
+                   ])
+        print('\n', query, '\n\n', values)
+        return self._query(query, **values)
+    
+    def createUser(self, login):
         try:
             #Create user in the DMBS
             self.driver.execute_query("""\
@@ -104,12 +125,14 @@ class Session:
                     (u)-[:Authored]->(r),
                     (r)-[:Targeted]->h"""
                               .format(h,u,r))
+    def _importDoctor(self, docd, hosd):
+        return self._abRelMerge('Doctor', docd, 'Hospital', hosd, WORKS_AT)
 
 if __name__ == '__main__':
-    s = Session()
-    s.login('neo4j','password')
-    s._deleteUser('test')
-    rec = s._query("""MATCH (u:User {username: 'test'})\
-            RETURN u.username AS name""")
-    s.createHospital(Hospital({'name':'tmh','address':'aaa lane','zip':32304}))
-    print(rec)
+    HOS = {'name':'tmh','address':'aaa lane','zip':32304}
+    DOC = {'name':'John Smith', 'specialty':'being boring'}
+    s = Session(AUTH)
+
+    s.createUser({'username':'unknown','password':'password'})
+    for record in s._importDoctor(DOC, HOS):
+        print(record.data())
