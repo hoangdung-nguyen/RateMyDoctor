@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+from datetime import datetime
 from neo4j import GraphDatabase
+from random import randint
 from uuid import uuid4 as uuid
 
 HOST = 'localhost'
@@ -10,20 +12,29 @@ URI = f'neo4j://{HOST}:{PORT}'
 A = 'a'
 B = 'b'
 R = 'r'
-MERGE = 'MERGE'
 
-WORKS_AT= 'Works_At'
+MATCH = 'MATCH'
+MERGE = 'MERGE'
+WORKS_AT = 'Works_At'
+WROTE = 'Wrote'
+REVIEWS = 'Reviews'
+RESPONDS_TO = 'Responds_To'
+
+USR = 'User'
+DOC = 'Doctor'
+HOS = 'Hospital'
+REV = 'Review'
+
 
 def _dictQuery(name:str='', d:dict|None=None) -> tuple[str,dict]:
     """Formats a dict as a string compatible with neo4j queries.
 
-    Also returns a dict to be passed to kwargs in a _query to maintain
-    typing."""
+    Also returns a dict to be passed to be used for neo4j variable-replacement"""
     
     if d == None or len(d) == 0:
         return ("",{})
 
-    string = "{" + ''.join([f", {k}: ${name+k}" for k,v in d.items()])
+    string = "{" + ''.join([f", {k}: ${name+k}" for k in d.keys()])
     string = string.replace(", ", "", 1) + '}'   #Gets rid of first comma
 
     values = {name+k:v for k,v in d.items()}    #replacement dict for _query
@@ -32,8 +43,7 @@ def _dictQuery(name:str='', d:dict|None=None) -> tuple[str,dict]:
 def _labelQuery(labels:str|list, name:str = '', d:dict|None = None, op='') -> tuple[str,dict]:
     """Formats a dict, label, and neo4j variable into a query line.
 
-    Also returns a dict to be passed to kwargs in a _query to maintain
-    typing."""
+    Also returns a dict to be passed to be used for neo4j variable-replacement"""
 
     if type(labels) is not list:
         labels = [labels]
@@ -63,29 +73,26 @@ class Session:
         self.auth = None
         self.uname = None
 
-    def _query(self, query, **kwargs):
-        if self.auth == None:
-            return False
+    def _executeQuery(self, query, **kwargs):
         records, summary, keys = self.driver.execute_query(query, auth_=self.auth, **kwargs)
         return records
 
-    def _abRelMerge(self, alab:str, adic:dict, blab:str, bdic:dict, rlab:str):
+    def _abRelMerge(self, alab:str, adic:dict, blab:str, bdic:dict, rlab:str, createA=True, createB=True):
         """Creates if not exist nodes a, b, and the relation (a)->[:rlab]->(b)"""
 
         query, values = "", {}
-        a, b = (A,adic,alab),(B,bdic,blab)
+        a = ({'name':A,'labels':alab,'d':adic},createA)
+        b = ({'name':B,'labels':blab,'d':bdic},createB)
 
         for var in (a,b):
-            print(var)
-            s,v = _labelQuery(*var, MERGE)
-            query = '\n'.join([query, s, _giveId(var[0])])
+            s,v = _labelQuery(**var[0], op=(MERGE if var[1] else MATCH))
+            query = '\n'.join([query, s, _giveId(var[0]['name']) if var[1] else ''])
             values = values | v
 
         query = '\n'.join([query,
                    f'MERGE ({A})-[{R}:{rlab}]->({B})', f'RETURN {A},{R},{B}'
                    ])
-        print('\n', query, '\n\n', values)
-        return self._query(query, **values)
+        return self._executeQuery(query, **values)
     
     def createUser(self, login):
         try:
@@ -104,18 +111,26 @@ class Session:
                 username=login['username'])
 
     def deleteUser(self, username):
-        self._query("""DROP USER $user IF EXISTS""", user=username)
-        self._query("""MATCH (u:User {username: $user})\
+        self._executeQuery("""DROP USER $user IF EXISTS""", user=username)
+        self._executeQuery("""MATCH (u:User {username: $user})\
                     DETACH DELETE u""", user=username)
 
-    def _importDoctor(self, docd, hosd):
-        return self._abRelMerge('Doctor', docd, 'Hospital', hosd, WORKS_AT)
+    def _importDoctor(self, doc, hos):
+        reviews = doc.pop(REV)
+        r = self._abRelMerge(DOC, doc, HOS, hos, WORKS_AT)
+        for rev in reviews:
+            rev['date'] = datetime.now()
+            r += self._abRelMerge(USR,
+                                  {'username': ''.join([chr(randint(65,90)) for _ in range(32)])},
+                                  REV, rev, WROTE)
+            r += self._abRelMerge(REV, rev, DOC, doc, REVIEWS)
+        return r
 
 if __name__ == '__main__':
-    HOS = {'name':'tmh','address':'aaa lane','zip':32304}
-    DOC = {'name':'John Smith', 'specialty':'being boring'}
+    T_HOS = {'name':'tmh','address':'aaa lane','zip':32304}
+    T_DOC = {'name':'John Smith', 'specialty':'being boring'}
     s = Session(AUTH)
 
     s.createUser({'username':'unknown','password':'password'})
-    for record in s._importDoctor(DOC, HOS):
+    for record in s._importDoctor(T_DOC, T_HOS):
         print(record.data())
