@@ -127,10 +127,4 @@ class Session:
         return r
 
 if __name__ == '__main__':
-    T_HOS = {'name':'tmh','address':'aaa lane','zip':32304}
-    T_DOC = {'name':'John Smith', 'specialty':'being boring'}
     s = Session(AUTH)
-
-    s.createUser({'username':'unknown','password':'password'})
-    for record in s._importDoctor(T_DOC, T_HOS):
-        print(record.data())
