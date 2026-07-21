@@ -77,8 +77,14 @@ class Session:
         records, summary, keys = self.driver.execute_query(query, auth_=self.auth, **kwargs)
         return records
 
-    def _abRelMerge(self, alab:str, adic:dict, blab:str, bdic:dict, rlab:str, createA=True, createB=True):
-        """Creates if not exist nodes a, b, and the relation (a)->[:rlab]->(b)"""
+    def _abRelMerge(self, alab:str, adic:dict,
+                          blab:str, bdic:dict,
+                          rlab:str, rdic=None,
+                          createA=True, createB=True):
+        """Creates if not exist nodes a, b, and the relation (a)->[:rlab]->(b)
+
+        [a/b][lab/dic] = [label/dictionary] of [first/second] object
+        r[lab/dic] = [label/dictionary] of relation"""
 
         query, values = "", {}
         a = ({'name':A,'labels':alab,'d':adic},createA)
@@ -89,8 +95,12 @@ class Session:
             query = '\n'.join([query, s, _giveId(var[0]['name']) if var[1] else ''])
             values = values | v
 
+        if rdic != None:
+            values['rdic'] = rdic
         query = '\n'.join([query,
-                   f'MERGE ({A})-[{R}:{rlab}]->({B})', f'RETURN {A},{R},{B}'
+                   f'MERGE ({A})-[{R}:{rlab}]->({B})\nRETURN {A},{R},{B}'
+                           if rdic == None else
+                           f'MERGE ({A})-[{R}:{rlab} {{$rdic}}]->({B})\nRETURN {A},{R},{B}'
                    ])
         return self._executeQuery(query, **values)
     
