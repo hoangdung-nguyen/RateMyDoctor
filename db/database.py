@@ -70,9 +70,9 @@ def _giveId(name:str) -> str:
 class Session:
     """An API for interacting with a neo4j database."""
 
-    def __init__(self, login=None, host=HOST, port=PORT, driverAuth=AUTH):
+    def __init__(self, login:tuple[str,str]|None=None, host=HOST, port=PORT, driverAuth=AUTH):
         self.driver = GraphDatabase.driver(f'neo4j://{host}:{port}', auth=driverAuth)
-        self.auth = None
+        self.auth = login
         if login is not None:
             self.login(*login)
 
@@ -84,57 +84,62 @@ class Session:
         records, summary, keys = self.driver.execute_query(query, auth_=self.auth, **kwargs)
         return [list(r.data().values())[0] for r in records]
 
-    def _abRelMerge(self, alab:str, adic:dict,
+    def _abRel(self, alab:str, adic:dict,
                           blab:str, bdic:dict,
                           rlab:str, rdic=None,
-                          createA=True, createB=True):
+                          createA=True, createB=True,
+                          final='RETURN a,r,b'):
         """Creates if not exist nodes a, b, and the relation (a)->[:rlab]->(b)
 
         [a/b][lab/dic] = [label/dictionary] of [first/second] object
-        r[lab/dic] = [label/dictionary] of relation"""
+        r[lab/dic] = [label/dictionary] of relation
+        final = the last operation"""
 
         query, values = "", {}
         a = ({'name':A,'labels':alab,'d':adic},createA)
         b = ({'name':B,'labels':blab,'d':bdic},createB)
+        opA = 'MERGE' if createA else 'MATCH'
+        opB = 'MERGE' if createB else 'MATCH'
 
         for var in (a,b):
             s,v = _labelQuery(**var[0], op=(MERGE if var[1] else MATCH))
-            query = '\n'.join([query, s, _giveId(var[0]['name']) if var[1] else ''])
+            query = '\n'.join([query, s, (_giveId(var[0]['name']) if var[1] else '')])
             values = values | v
 
         if rdic != None:
             values['rdic'] = rdic
         query = '\n'.join([query,
-                   f'MERGE ({A})-[{R}:{rlab}]->({B})\nRETURN {A},{R},{B}'
+                   f'{opA} ({A})-[{R}:{rlab}]->({B})\n{final}'
                            if rdic == None else
-                           f'MERGE ({A})-[{R}:{rlab} {{$rdic}}]->({B})\nRETURN {A},{R},{B}'
+                           f'{opB} ({A})-[{R}:{rlab} {{$rdic}}]->({B})\n{final}'
                    ])
+        print(query)
         return self._executeQuery(query, **values)
 
     def _importDoctor(self, doc, hos):
         reviews = doc.pop(REV)
-        r = self._abRelMerge(DOC, doc, HOS, hos, WORKS_AT)
+        r = self._abRel(DOC, doc, HOS, hos, WORKS_AT)
         for rev in reviews:
             rev['date'] = datetime.now()
-            r += self._abRelMerge(USR,
+            r += self._abRel(USR,
                                   {'username': ''.join([chr(randint(65,90)) for _ in range(32)])},
                                   REV, rev, WROTE)
-            r += self._abRelMerge(REV, rev, DOC, doc, REVIEWS)
+            r += self._abRel(REV, rev, DOC, doc, REVIEWS)
         return r
 
     #==================#
     # Public Interface #
     #==================#
 
-    def login(self, username, password):
+    def login(self, username:str, password:str):
         self.auth = (username, password)
-        self.uname = username
+        self.uname = {'username':username}
 
     def logout(self):
         self.auth = None
         self.uname = None
     
-    def createUser(self, login):
+    def createUser(self, login:dict):
         try:
             #Create user in the DMBS
             self.driver.execute_query("""\
@@ -156,44 +161,76 @@ class Session:
                     DETACH DELETE u""", user=username)
 
     def createDoctor(self, doctor:dict, hospital:dict):
-        self._abRelMerge(DOC, doctor, HOS, hospital, WORKS_AT)
+        self._abRel(DOC, doctor, HOS, hospital, WORKS_AT)
 
     def createReview(self, review:dict, doctor:dict):
-        self._abRelMerge(USR, self.uname, REV, giveDate(review), WROTE)
-        self._abRelMerge(REV, review, DOC, doctor, REVIEWS)
+        """Only allows one review per doctor"""
+        r = self._abRel(USR, self.uname, REV, {}, WROTE,
+                       createA=False, createB=False, final='RETURN b')
+        if len(r) > 0:
+            s.deleteReview(r[0])
 
-    def deleteReview(self):
-        pass
+        self._abRel(USR, self.uname, REV, giveDate(review), WROTE)
+        self._abRel(REV, review, DOC, doctor, REVIEWS)
+
+    def deleteReview(self, review, user:dict|None=None):
+        """Do not specify user if used to delete own review"""
+        if user == None:
+            user = self.uname
+        self._abRel(USR, user, REV, review, WROTE, 
+                    createA=False, createB=False, final='DETACH DELETE b')
 
     def createReport(self, review:dict, reason:str):
         report = {CONTENT:reason, DATE:datetime.now()}
-        self._abRelMerge(USR, self.uname, REV, review, REPORTS, rdic=report)
+        self._abRel(USR, self.uname, REV, review, REPORTS, rdic=report)
 
     def getReports(self):
-        pass
+        return self._abRel('',{},'',{},REPORTS, createA=False, createB=False)
 
     def requestVerification(self):
         pass
 
+    def getVerificationRequests(self):
+        # needs to only be available to admin
+        pass
+
     def approveVerification(self):
+        # needs to only be available to admin
+        # needs to give a user Doctor permissions & update the relation to IS
         pass
     
     def denyVerification(self):
+        # needs to only be available to admin
         pass
 
-    def getVerificationRequests(self):
-        pass
+    def getDoctorRating(self, doctor:dict)->float:
+        doc, values = _dictQuery(d=doctor)
+        return self._executeQuery(f"""MATCH (:{DOC} {doc})<-[]-(r:{REV})
+                                  RETURN avg(toInteger(r.rating))"""
+                           , **values)[0]
 
-    def getRating(self):
-        pass
+    def getHospitalRating(self, hospital:dict)->float:
+        hos, values = _dictQuery(d=hospital)
+        return self._executeQuery(f"""MATCH (:{HOS} {hos})<-[]-(d:{DOC})
+                                  MATCH (d)<-[]-(r:{REV})
+                                  RETURN avg(toInteger(r.rating))"""
+                           , **values)[0]
 
-    def getReviews(self):
-        pass
+    def getDoctorReviews(self, doctor:dict)->list[dict]:
+        doc, values = _dictQuery(d=doctor)
+        return self._executeQuery(f"""MATCH (:{DOC} {doc})<-[]-(r:{REV})
+                                  RETURN r """,**values)
+
+    def getHospitalReviews(self, hospital:dict)->list[dict]:
+        hos, values = _dictQuery(d=hospital)
+        return self._executeQuery(f"""MATCH (:{HOS} {hos})<-[]-(d:{DOC})
+                                  MATCH (d)<-[]-(r:{REV})
+                                  RETURN r """,**values)
 
     def search(self, search:str, label:str|None=None, fields:dict|None=None):
         pass
 
-    def findNear(self, zip:str, range:int):
+    def findNear(self, zip:str, range:int)->list[dict]:
         """Returns a list of hospitals within range of a zip code"""
         validZips = [z for z, coords, in zipcodes.items()
                  if (haversine(zipcodes[zip], coords, unit=Unit.MILES) <= range)]
@@ -201,5 +238,8 @@ class Session:
 
 if __name__ == '__main__':
     s = Session(AUTH)
+
+    #s.createDoctor({'name':'testdoc'},{'uuid': "f45396e8-31b0-4ba7-b4d1-2cb74887300c"})
+    #s.createReview({'body':'bad','rating':'3'},{'name':'testdoc'})
+    s.deleteReview({'body':'bad'})
     found = s.findNear('32162',500)
-    
