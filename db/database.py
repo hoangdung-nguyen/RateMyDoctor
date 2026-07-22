@@ -29,6 +29,7 @@ DOC = 'Doctor'
 HOS = 'Hospital'
 REV = 'Review'
 
+NAME = 'name'
 BODY = 'body'
 DATE = 'date'
 UUID = 'uuid'
@@ -236,23 +237,18 @@ class Session:
     def search(self, search:str, label:str|None=None, fields:dict|None=None):
         pass
 
-    def findNear(self, zip:str, range:int)->list[dict]:
+    def findNear(self, zip:str, range:int)->list:
         """Returns a list of hospitals within range of a zip code"""
         validZips = [z for z, coords, in zipcodes.items()
                  if (haversine(zipcodes[zip], coords, unit=Unit.MILES) <= range)]
         return self._executeQuery(f"MATCH (h:Hospital) WHERE h.zip IN {validZips} RETURN h")
 
     def _tests(self):
-        print(s.getDoctorRating({UUID:'e16fd1f0-3ca8-4596-9223-7c050987d2a9'}))
+        testdoc = {NAME:'Dr. Kimberly Ireland'}
+        print('doc rating', s.getDoctorRating(testdoc) == 4.905000000000001)
+        print('doc reviews', len(s.getDoctorReviews(testdoc))==200)
+        print('findNear',len(s.findNear('32162',500))==17)
+
 if __name__ == '__main__':
     s = Session(AUTH)
     s._tests()
-
-
-    #s.createDoctor({'name':'testdoc'},{UUID: "f45396e8-31b0-4ba7-b4d1-2cb74887300c"})
-    #s.createReview({BODY:'bad','rating':'3'},{'name':'testdoc'})
-    #s.deleteReview({BODY:'bad'})
-    #s.createReport({UUID:'092acdad-68ac-472c-b972-a17ecb65ec3f'},'dumb')
-    #s.createReport({UUID:'cdc05ccd-3cac-4d61-818d-6c89ebc8878d'},'AAAAAAAAAAAAAAAAAAA')
-    #[print(i,'\n') for i in s.getReports()]
-    found = s.findNear('32162',500)
