@@ -83,7 +83,7 @@ class Session:
 
     def _executeQuery(self, query, **kwargs):
         records, summary, keys = self.driver.execute_query(query, auth_=self.auth, **kwargs)
-        return [list(r.data().values())[0] for r in records]
+        return [list(r.data().values()) for r in records]
 
     def _abRel(self, alab:str, adic:dict,
                           blab:str, bdic:dict,
@@ -181,13 +181,15 @@ class Session:
                     createA=False, createB=False, final='DETACH DELETE b')
 
     def createReport(self, review:dict, reason:str):
-        self._abRel(USR, self.uname, REV, {}, REPORTED, 
+        r = self._abRel(USR, self.uname, REV, {'uuid':review['uuid']}, REPORTED, 
                     createA=False, createB=False, final='DETACH DELETE r')
         report = {BODY:reason, DATE:datetime.now()}
         self._abRel(USR, self.uname, REV, review, REPORTED, rdic=report, createB=False, createA=False)
 
     def getReports(self):
-        return self._abRel('',{},'',{},REPORTED, createA=False, createB=False)
+        result = self._executeQuery(f"""MATCH (u:{USR})-[r:{REPORTED}]->(c)
+                                    RETURN u,r,r.body,c """)
+        return [{'reporter':r[0],'reason':r[2],'reportedContent':r[3]} for r in result]
 
     def requestVerification(self):
         pass
@@ -209,25 +211,27 @@ class Session:
         doc, values = _dictQuery(d=doctor)
         return self._executeQuery(f"""MATCH (:{DOC} {doc})<-[]-(r:{REV})
                                   RETURN avg(toInteger(r.rating))"""
-                           , **values)[0]
+                           , **values)[0][0]
 
     def getHospitalRating(self, hospital:dict)->float:
         hos, values = _dictQuery(d=hospital)
         return self._executeQuery(f"""MATCH (:{HOS} {hos})<-[]-(d:{DOC})
                                   MATCH (d)<-[]-(r:{REV})
                                   RETURN avg(toInteger(r.rating))"""
-                           , **values)[0]
+                           , **values)[0][0]
 
     def getDoctorReviews(self, doctor:dict)->list[dict]:
         doc, values = _dictQuery(d=doctor)
-        return self._executeQuery(f"""MATCH (:{DOC} {doc})<-[]-(r:{REV})
-                                  RETURN r """,**values)
+        return [i[0] for i in 
+                self._executeQuery(f"""MATCH (:{DOC} {doc})<-[]-(r:{REV})
+                                  RETURN r """,**values)]
 
     def getHospitalReviews(self, hospital:dict)->list[dict]:
         hos, values = _dictQuery(d=hospital)
-        return self._executeQuery(f"""MATCH (:{HOS} {hos})<-[]-(d:{DOC})
+        return [i[0] for i in 
+                self._executeQuery(f"""MATCH (:{HOS} {hos})<-[]-(d:{DOC})
                                   MATCH (d)<-[]-(r:{REV})
-                                  RETURN r """,**values)
+                                  RETURN r """,**values)]
 
     def search(self, search:str, label:str|None=None, fields:dict|None=None):
         pass
@@ -244,5 +248,7 @@ if __name__ == '__main__':
     #s.createDoctor({'name':'testdoc'},{UUID: "f45396e8-31b0-4ba7-b4d1-2cb74887300c"})
     #s.createReview({BODY:'bad','rating':'3'},{'name':'testdoc'})
     #s.deleteReview({BODY:'bad'})
-    s.createReport({UUID:'092acdad-68ac-472c-b972-a17ecb65ec3f'},'dumb')
+    #s.createReport({UUID:'092acdad-68ac-472c-b972-a17ecb65ec3f'},'dumb')
+    s.createReport({UUID:'cdc05ccd-3cac-4d61-818d-6c89ebc8878d'},'AAAAAAAAAAAAAAAAAAA')
+    [print(i,'\n') for i in s.getReports()]
     found = s.findNear('32162',500)
