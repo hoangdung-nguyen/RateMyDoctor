@@ -242,13 +242,17 @@ class Session:
                  if (haversine(zipcodes[zip], coords, unit=Unit.MILES) <= range)]
         return self._executeQuery(f"MATCH (h:Hospital) WHERE h.zip IN {validZips} RETURN h")
 
+    def _tests(self):
+        print(s.getDoctorRating({UUID:'e16fd1f0-3ca8-4596-9223-7c050987d2a9'}))
 if __name__ == '__main__':
     s = Session(AUTH)
+    s._tests()
+
 
     #s.createDoctor({'name':'testdoc'},{UUID: "f45396e8-31b0-4ba7-b4d1-2cb74887300c"})
     #s.createReview({BODY:'bad','rating':'3'},{'name':'testdoc'})
     #s.deleteReview({BODY:'bad'})
     #s.createReport({UUID:'092acdad-68ac-472c-b972-a17ecb65ec3f'},'dumb')
-    s.createReport({UUID:'cdc05ccd-3cac-4d61-818d-6c89ebc8878d'},'AAAAAAAAAAAAAAAAAAA')
-    [print(i,'\n') for i in s.getReports()]
+    #s.createReport({UUID:'cdc05ccd-3cac-4d61-818d-6c89ebc8878d'},'AAAAAAAAAAAAAAAAAAA')
+    #[print(i,'\n') for i in s.getReports()]
     found = s.findNear('32162',500)
