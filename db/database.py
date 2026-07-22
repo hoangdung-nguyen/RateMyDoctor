@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from datetime import datetime
+from haversine import haversine, Unit
 from neo4j import GraphDatabase
 from random import randint
 from uuid import uuid4 as uuid
+from zipcodes import zipcodes
 
 HOST = 'localhost'
 PORT = '7687'
@@ -15,8 +17,10 @@ R = 'r'
 
 MATCH = 'MATCH'
 MERGE = 'MERGE'
+
 WORKS_AT = 'Works_At'
 WROTE = 'Wrote'
+REPORTS = 'Reports'
 REVIEWS = 'Reviews'
 RESPONDS_TO = 'Responds_To'
 
@@ -24,6 +28,10 @@ USR = 'User'
 DOC = 'Doctor'
 HOS = 'Hospital'
 REV = 'Review'
+
+CONTENT = 'content'
+DATE = 'date'
+
 
 
 def _dictQuery(name:str='', d:dict|None=None) -> tuple[str,dict]:
@@ -52,6 +60,10 @@ def _labelQuery(labels:str|list, name:str = '', d:dict|None = None, op='') -> tu
     string = (f'{op} ({name}:{':'.join([l for l in labels])} {string})')
     return (string, values)
 
+def giveDate(d:dict)->dict:
+    d['date'] = datetime.now()
+    return d
+
 def _giveId(name:str) -> str:
     return f"ON CREATE SET {name}.uuid = '{uuid()}'"
 
@@ -60,22 +72,17 @@ class Session:
 
     def __init__(self, login=None, host=HOST, port=PORT, driverAuth=AUTH):
         self.driver = GraphDatabase.driver(f'neo4j://{host}:{port}', auth=driverAuth)
-            #Driver is known to be expensive, use as few as possible
         self.auth = None
         if login is not None:
             self.login(*login)
 
-    def login(self, username, password):
-        self.auth = (username, password)
-        self.uname = username
-
-    def logout(self):
-        self.auth = None
-        self.uname = None
+    #=================#
+    # Private Methods #
+    #=================#
 
     def _executeQuery(self, query, **kwargs):
         records, summary, keys = self.driver.execute_query(query, auth_=self.auth, **kwargs)
-        return records
+        return [list(r.data().values())[0] for r in records]
 
     def _abRelMerge(self, alab:str, adic:dict,
                           blab:str, bdic:dict,
@@ -103,6 +110,29 @@ class Session:
                            f'MERGE ({A})-[{R}:{rlab} {{$rdic}}]->({B})\nRETURN {A},{R},{B}'
                    ])
         return self._executeQuery(query, **values)
+
+    def _importDoctor(self, doc, hos):
+        reviews = doc.pop(REV)
+        r = self._abRelMerge(DOC, doc, HOS, hos, WORKS_AT)
+        for rev in reviews:
+            rev['date'] = datetime.now()
+            r += self._abRelMerge(USR,
+                                  {'username': ''.join([chr(randint(65,90)) for _ in range(32)])},
+                                  REV, rev, WROTE)
+            r += self._abRelMerge(REV, rev, DOC, doc, REVIEWS)
+        return r
+
+    #==================#
+    # Public Interface #
+    #==================#
+
+    def login(self, username, password):
+        self.auth = (username, password)
+        self.uname = username
+
+    def logout(self):
+        self.auth = None
+        self.uname = None
     
     def createUser(self, login):
         try:
@@ -125,16 +155,51 @@ class Session:
         self._executeQuery("""MATCH (u:User {username: $user})\
                     DETACH DELETE u""", user=username)
 
-    def _importDoctor(self, doc, hos):
-        reviews = doc.pop(REV)
-        r = self._abRelMerge(DOC, doc, HOS, hos, WORKS_AT)
-        for rev in reviews:
-            rev['date'] = datetime.now()
-            r += self._abRelMerge(USR,
-                                  {'username': ''.join([chr(randint(65,90)) for _ in range(32)])},
-                                  REV, rev, WROTE)
-            r += self._abRelMerge(REV, rev, DOC, doc, REVIEWS)
-        return r
+    def createDoctor(self, doctor:dict, hospital:dict):
+        self._abRelMerge(DOC, doctor, HOS, hospital, WORKS_AT)
+
+    def createReview(self, review:dict, doctor:dict):
+        self._abRelMerge(USR, self.uname, REV, giveDate(review), WROTE)
+        self._abRelMerge(REV, review, DOC, doctor, REVIEWS)
+
+    def deleteReview(self):
+        pass
+
+    def createReport(self, review:dict, reason:str):
+        report = {CONTENT:reason, DATE:datetime.now()}
+        self._abRelMerge(USR, self.uname, REV, review, REPORTS, rdic=report)
+
+    def getReports(self):
+        pass
+
+    def requestVerification(self):
+        pass
+
+    def approveVerification(self):
+        pass
+    
+    def denyVerification(self):
+        pass
+
+    def getVerificationRequests(self):
+        pass
+
+    def getRating(self):
+        pass
+
+    def getReviews(self):
+        pass
+
+    def search(self, search:str, label:str|None=None, fields:dict|None=None):
+        pass
+
+    def findNear(self, zip:str, range:int):
+        """Returns a list of hospitals within range of a zip code"""
+        validZips = [z for z, coords, in zipcodes.items()
+                 if (haversine(zipcodes[zip], coords, unit=Unit.MILES) <= range)]
+        return self._executeQuery(f"MATCH (h:Hospital) WHERE h.zip IN {validZips} RETURN h")
 
 if __name__ == '__main__':
     s = Session(AUTH)
+    found = s.findNear('32162',500)
+    
