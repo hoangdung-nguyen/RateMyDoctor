@@ -20,7 +20,7 @@ MERGE = 'MERGE'
 
 WORKS_AT = 'Works_At'
 WROTE = 'Wrote'
-REPORTS = 'Reports'
+REPORTED = 'Reported'
 REVIEWS = 'Reviews'
 RESPONDS_TO = 'Responds_To'
 
@@ -29,8 +29,9 @@ DOC = 'Doctor'
 HOS = 'Hospital'
 REV = 'Review'
 
-CONTENT = 'content'
+BODY = 'body'
 DATE = 'date'
+UUID = 'uuid'
 
 
 
@@ -98,8 +99,6 @@ class Session:
         query, values = "", {}
         a = ({'name':A,'labels':alab,'d':adic},createA)
         b = ({'name':B,'labels':blab,'d':bdic},createB)
-        opA = 'MERGE' if createA else 'MATCH'
-        opB = 'MERGE' if createB else 'MATCH'
 
         for var in (a,b):
             s,v = _labelQuery(**var[0], op=(MERGE if var[1] else MATCH))
@@ -107,11 +106,12 @@ class Session:
             values = values | v
 
         if rdic != None:
-            values['rdic'] = rdic
+            rdic, v = _dictQuery(name=R, d=rdic)
+            values = values | v
         query = '\n'.join([query,
-                   f'{opA} ({A})-[{R}:{rlab}]->({B})\n{final}'
+                   f'MATCH ({A})-[{R}:{rlab}]->({B})\n{final}'
                            if rdic == None else
-                           f'{opB} ({A})-[{R}:{rlab} {{$rdic}}]->({B})\n{final}'
+                           f'MERGE ({A})-[{R}:{rlab} {rdic}]->({B})\n{final}'
                    ])
         print(query)
         return self._executeQuery(query, **values)
@@ -181,11 +181,13 @@ class Session:
                     createA=False, createB=False, final='DETACH DELETE b')
 
     def createReport(self, review:dict, reason:str):
-        report = {CONTENT:reason, DATE:datetime.now()}
-        self._abRel(USR, self.uname, REV, review, REPORTS, rdic=report)
+        self._abRel(USR, self.uname, REV, {}, REPORTED, 
+                    createA=False, createB=False, final='DETACH DELETE r')
+        report = {BODY:reason, DATE:datetime.now()}
+        self._abRel(USR, self.uname, REV, review, REPORTED, rdic=report, createB=False, createA=False)
 
     def getReports(self):
-        return self._abRel('',{},'',{},REPORTS, createA=False, createB=False)
+        return self._abRel('',{},'',{},REPORTED, createA=False, createB=False)
 
     def requestVerification(self):
         pass
@@ -239,7 +241,8 @@ class Session:
 if __name__ == '__main__':
     s = Session(AUTH)
 
-    #s.createDoctor({'name':'testdoc'},{'uuid': "f45396e8-31b0-4ba7-b4d1-2cb74887300c"})
-    #s.createReview({'body':'bad','rating':'3'},{'name':'testdoc'})
-    s.deleteReview({'body':'bad'})
+    #s.createDoctor({'name':'testdoc'},{UUID: "f45396e8-31b0-4ba7-b4d1-2cb74887300c"})
+    #s.createReview({BODY:'bad','rating':'3'},{'name':'testdoc'})
+    #s.deleteReview({BODY:'bad'})
+    s.createReport({UUID:'092acdad-68ac-472c-b972-a17ecb65ec3f'},'dumb')
     found = s.findNear('32162',500)
