@@ -296,11 +296,56 @@ class Session:
         print('search',
               s.search('kimb irelnd', DOC, {'specialty':'Ophthalmologist'})[0][0]['name']
               == testdoc['name'])
+        #print(s.getAllDoctors(5))
+        #print(s.getSpecialties())
 
     #====================#
     # Requested Functions#
     #====================#
 
+    def getDoctorProfile( self, doctor_uuid: str) -> dict | None:
+        """
+        Return:
+            {
+            "doctor": {...},
+            "hospital": {...} or None,
+            "average_rating": 4.5,
+            "reviews": [...]
+            }
+        Return None when the doctor does not exist.
+        """
+        try:
+            doc, _, hosp = self._abRel(DOC, {'uuid':doctor_uuid}, HOS, {}, WORKS_AT,
+                                       createA=False, createB=False)[0]
+            reviews = self.getDoctorReviews(doc)
+            rating  = self.getDoctorRating(doc)
+            return {'doctor':doc,'hospital':hosp,'average_rating':rating,'reviews':reviews}
+        except:
+            return None
+
+    def getAllDoctors( self,
+        limit: int = 20,
+        offset: int = 0,
+        specialty: str | None = None,
+        sort_by: str = "rating"
+        ) -> list[dict]:
+        """
+        Return doctors for a browse-all page with pagination,
+        filtering, ratings, review counts, and hospital information.
+        """
+        docs =  [i for i,_ in self._executeQuery(f"""MATCH (doctor:Doctor)<-[:Reviews]-(reviews) 
+                           RETURN doctor, avg(toInteger(reviews.rating)) as average_rating
+                           ORDER BY average_rating DESC OFFSET {offset*limit} LIMIT {limit}""")]
+        return [{k:v for k,v in self.getDoctorProfile(d['uuid']).items()
+                 if k != 'reviews'} for d in docs]
+
+    def getSpecialties(self) -> list[str]:
+        """
+        Return every distinct doctor specialty in alphabetical order.
+        """ 
+        return [i[0] for i in self._executeQuery(f"""MATCH (d:Doctor) WITH d.specialty
+                                                 as specialty
+                           RETURN DISTINCT specialty ORDER BY specialty""")]
 
 if __name__ == '__main__':
     s = Session(AUTH)
