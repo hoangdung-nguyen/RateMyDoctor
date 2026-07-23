@@ -120,13 +120,13 @@ class Session:
 
     def _importDoctor(self, doc, hos):
         reviews = doc.pop(REV)
-        r = self._abRel(DOC, doc, HOS, hos, WORKS_AT)
+        r = self._abRel(DOC, doc, HOS, hos, WORKS_AT, rdic={})
         for rev in reviews:
             rev['date'] = str(datetime.now())
             r += self._abRel(USR,
                                   {'username': ''.join([chr(randint(65,90)) for _ in range(32)])},
-                                  REV, rev, WROTE)
-            r += self._abRel(REV, rev, DOC, doc, REVIEWS)
+                                  REV, rev, WROTE, rdic={})
+            r += self._abRel(REV, rev, DOC, doc, REVIEWS, rdic={})
         return r
 
     #==================#

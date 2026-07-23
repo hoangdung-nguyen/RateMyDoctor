@@ -30,8 +30,8 @@ def ignore(obj):
         return False
     hrefs.append(obj['href'])
 
-    if 'United States' not in obj['data']['facilities'][0]['address']\
-            or 'FL' not in obj['data']['facilities'][0]['address']:
+    if 'United States' not in obj['data']['facilities'][0]['address']:
+            #or 'FL' not in obj['data']['facilities'][0]['address']:
         return False
     for i in range(len(obj['reviews'])):
         rev = obj['reviews'][i]
@@ -102,6 +102,9 @@ def makeIndexes():
                     """) #needs to go to setup
 
 if __name__ == '__main__':
+    print('Deleting existing data..."')
     cleanup()
+    print('Importing scraped data...')
     importScrapedData()
+    print('Import sucessful.')
     makeIndexes()
