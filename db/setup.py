@@ -98,10 +98,14 @@ def importScrapedData(max=None):
     [t.join for t in threads]
 
 def makeIndexes():
-    s._executeQuery(f"""
-                    CREATE FULLTEXT INDEX names IF NOT EXISTS
-                    FOR (n:{DOC}|{HOS}) ON EACH [n.{NAME}]
-                    """) #needs to go to setup
+    def makeIndex(iName,labels, properties):
+        s._executeQuery(f"""
+                        CREATE FULLTEXT INDEX {iName} IF NOT EXISTS
+                        FOR (n:{'|'.join(labels)})
+                        ON EACH[{','.join(['n.'+p for p in properties])}]
+                        """)
+
+    makeIndex('names',[DOC,HOS],[NAME])
 
 if __name__ == '__main__':
     if input('Clean & Import Data? (y/n)').lower() == 'y':
