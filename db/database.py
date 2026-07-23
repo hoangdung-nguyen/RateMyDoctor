@@ -65,7 +65,7 @@ def _labelQuery(labels:str|list, name:str = '', d:dict|None = None, op='') -> tu
     return (string, values)
 
 def giveDate(d:dict)->dict:
-    d['date'] = datetime.now()
+    d['date'] = str(datetime.now())
     return d
 
 def _giveId(name:str) -> str:
@@ -122,7 +122,7 @@ class Session:
         reviews = doc.pop(REV)
         r = self._abRel(DOC, doc, HOS, hos, WORKS_AT)
         for rev in reviews:
-            rev['date'] = datetime.now()
+            rev['date'] = str(datetime.now())
             r += self._abRel(USR,
                                   {'username': ''.join([chr(randint(65,90)) for _ in range(32)])},
                                   REV, rev, WROTE)
@@ -185,7 +185,7 @@ class Session:
     def createReport(self, review:dict, reason:str):
         self._abRel(USR, self.uname, REV, {'uuid':review['uuid']}, REPORTED, rdic={},
                     createA=False, createB=False, final='DETACH DELETE r')
-        report = {BODY:reason, DATE:datetime.now()}
+        report = {BODY:reason, DATE:str(datetime.now())}
         self._abRel(USR, self.uname, REV, review, REPORTED, rdic=report, createB=False, createA=False)
 
     def getReports(self):
@@ -257,7 +257,7 @@ class Session:
         s.requestVerification(testdoc, 'im witawawy hiwm')
         print('verification', s.getVerificationRequests()[0]['reason'] == 'im witawawy hiwm')
         s.approveVerification(self.uname, testdoc)
-        [print(i) for i in s.search('kim ireland')]
+        #[print(i) for i in s.getDoctorReviews(s.search('kim ireland')[0][0])]
 
 
 if __name__ == '__main__':
