@@ -30,6 +30,7 @@ USR = 'User'
 DOC = 'Doctor'
 HOS = 'Hospital'
 REV = 'Review'
+COM = 'Comment'
 
 NAME = 'name'
 BODY = 'body'
@@ -168,7 +169,7 @@ class Session:
 
         #Create user as a database object
         self.driver.execute_query("""\
-                CREATE (:User {username: $username})""",
+                MERGE (:User {username: $username})""",
                 username=login['username'])
 
     def deleteUser(self, username):
@@ -196,8 +197,14 @@ class Session:
         self._abRel(USR, user, REV, review, WROTE, rdic={},
                     createA=False, createB=False, final='DETACH DELETE b')
 
-    def createComment(self, comment, target):
-        target = {'uuid':target['uuid']}
+    def createComment(self, comment:str, target_uuid:str):
+        c = self._abRel(USR, self.uname, COM, giveDate({'body':comment}), 
+                        WROTE, final='RETURN b', rdic={})[0][0]
+        c,v = _dictQuery(d=c)
+        self._executeQuery(f"""MATCH (target:{COM}|{REV} {{uuid:'{target_uuid}'}})
+                           MATCH (comment:{COM} {c}) WITH comment, target
+                           MERGE (comment)-[:{RESPONDS_TO}]->(target)""",**v)
+
 
     def createReport(self, review:dict, reason:str):
         self._abRel(USR, self.uname, REV, {'uuid':review['uuid']}, REPORTED, rdic={},
@@ -283,7 +290,7 @@ class Session:
                  if (haversine(zipcodes[zip], coords, unit=Unit.MILES) <= range)]
         return [h[0] for h in self._executeQuery(f"MATCH (h:Hospital) WHERE h.zip IN {validZips} RETURN h")]
 
-    def getDIdsFromHos(self, hospital):
+    def getDIdsFromHos(self, hospital:dict):
         h,v = _dictQuery(d=hospital)
         return [d[0] for d in self._executeQuery(f'MATCH (d:{DOC})-->(:{HOS} {h})\
                                                         RETURN d.uuid',**v)]
@@ -291,8 +298,6 @@ class Session:
     def _tests(self):
         testdoc = {NAME:'Dr. Kimberly Ireland'}
         print('doc rating', s.getDoctorRating(testdoc) == 4.905000000000001)
-        #print('doc reviews', len(s.getDoctorReviews(testdoc))==200)
-        #print('findNear',len(s.findNear('32162',500))==17)
 
         s.createUser({'username':'neo4j','password':'password'})
         s.requestVerification(testdoc, 'im witawawy hiwm')
@@ -301,6 +306,10 @@ class Session:
         print('search',
               s.search('kimb irelnd Ophthalmologist', label=DOC)[0][0]['name']
               == testdoc['name'])
+        rev = s.getDoctorProfile(s.searchDoctors('kimb irelnd Ophthalmologist')[0]['doctor']['uuid'])['reviews'][0]['uuid']
+        s.createComment('aaahhhhhhhhhhaaaaAAAAAAAA',rev)
+        
+
 
         #[print(s.getDoctorProfile(i)['doctor']) for i in s.getDIdsFromHos(s.findNear('32304',300)[0])]
         #print(s.getAllDoctors(5))
@@ -320,8 +329,17 @@ class Session:
                 d,v = _dictQuery(d=e[0])
                 ls += [i[0] for i in self._executeQuery(
                     f"""MATCH (d:{DOC})-[:{WORKS_AT}]->(:{HOS} {d}) RETURN d""",**v)]
-        return [{k:v for k,v in self.getDoctorProfile(d['uuid']).items()
-                 if k != 'reviews'} for d in ls]
+        resList = []
+        for d in ls:
+            res = {}
+            for k,v in self.getDoctorProfile(d['uuid']).items():
+                if k != 'reviews':
+                    res[k] = v
+                else:
+                    res['review_count'] = len(v)
+            resList.append(res)
+        return resList
+
 
 
     def getDoctorProfile( self, doctor_uuid: str) -> dict | None:
