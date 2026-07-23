@@ -281,7 +281,12 @@ class Session:
         """Returns a list of hospitals within range of a zip code"""
         validZips = [z for z, coords, in zipcodes.items()
                  if (haversine(zipcodes[zip], coords, unit=Unit.MILES) <= range)]
-        return self._executeQuery(f"MATCH (h:Hospital) WHERE h.zip IN {validZips} RETURN h")
+        return [h[0] for h in self._executeQuery(f"MATCH (h:Hospital) WHERE h.zip IN {validZips} RETURN h")]
+
+    def getDIdsFromHos(self, hospital):
+        h,v = _dictQuery(d=hospital)
+        return [d[0] for d in self._executeQuery(f'MATCH (d:{DOC})-->(:{HOS} {h})\
+                                                        RETURN d.uuid',**v)]
 
     def _tests(self):
         testdoc = {NAME:'Dr. Kimberly Ireland'}
@@ -296,6 +301,8 @@ class Session:
         print('search',
               s.search('kimb irelnd Ophthalmologist', label=DOC)[0][0]['name']
               == testdoc['name'])
+
+        #[print(s.getDoctorProfile(i)['doctor']) for i in s.getDIdsFromHos(s.findNear('32304',300)[0])]
         #print(s.getAllDoctors(5))
         #print(s.getSpecialties())
         #[print(i) for i in s.searchDoctors('plastic', 5)]
