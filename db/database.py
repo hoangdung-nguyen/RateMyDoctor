@@ -182,6 +182,9 @@ class Session:
         self._abRel(USR, user, REV, review, WROTE, rdic={},
                     createA=False, createB=False, final='DETACH DELETE b')
 
+    def createComment(self, comment, target):
+        target = {'uuid':target['uuid']}
+
     def createReport(self, review:dict, reason:str):
         self._abRel(USR, self.uname, REV, {'uuid':review['uuid']}, REPORTED, rdic={},
                     createA=False, createB=False, final='DETACH DELETE r')
@@ -259,11 +262,6 @@ class Session:
         s.approveVerification(self.uname, testdoc)
         #[print(i) for i in s.getDoctorReviews(s.search('kim ireland')[0][0])]
 
-
 if __name__ == '__main__':
     s = Session(AUTH)
-    s._executeQuery(f"""
-                    CREATE FULLTEXT INDEX names IF NOT EXISTS
-                    FOR (n:{DOC}|{HOS}) ON EACH [n.{NAME}]
-                    """) #needs to go to setup
     s._tests()

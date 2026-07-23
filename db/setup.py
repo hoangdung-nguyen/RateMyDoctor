@@ -95,6 +95,13 @@ def importScrapedData():
         t.start()
     [t.join for t in threads]
 
+def makeIndexes():
+    s._executeQuery(f"""
+                    CREATE FULLTEXT INDEX names IF NOT EXISTS
+                    FOR (n:{DOC}|{HOS}) ON EACH [n.{NAME}]
+                    """) #needs to go to setup
+
 if __name__ == '__main__':
     cleanup()
     importScrapedData()
+    makeIndexes()
