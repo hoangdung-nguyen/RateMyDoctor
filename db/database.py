@@ -255,7 +255,7 @@ class Session:
                                   MATCH (d)<-[]-(r:{REV})
                                   RETURN r """,**values)]
 
-    def search(self, search:str, label:str='', props:dict|None=None):
+    def search(self, search:str, limit:int=50, offset:int=0, label:str='', props:dict|None=None):
         """Fuzzyfind, most relevant node at index 0"""
 
         search = ' '.join([c+'~' for c in search.split(' ')]) # lucine fuzzyfind syntax
@@ -273,7 +273,7 @@ class Session:
             filter = ' AND '.join(filter)
         if filter != None:
             query.append(filter)
-        query.append('RETURN node')
+        query.append(f'RETURN node OFFSET {offset} LIMIT {limit}')
 
         return self._executeQuery('\n'.join(query))
 
@@ -294,14 +294,28 @@ class Session:
         print('verification', s.getVerificationRequests()[0]['reason'] == 'im witawawy hiwm')
         s.approveVerification(self.uname, testdoc)
         print('search',
-              s.search('kimb irelnd', DOC, {'specialty':'Ophthalmologist'})[0][0]['name']
+              s.search('kimb irelnd Ophthalmologist', label=DOC)[0][0]['name']
               == testdoc['name'])
         #print(s.getAllDoctors(5))
         #print(s.getSpecialties())
+        #[print(i) for i in s.searchDoctors('plastic', 5)]
 
     #====================#
     # Requested Functions#
     #====================#
+
+    def searchDoctors( self, search_term: str, limit: int = 50, offset: int = 0) -> list[dict]:
+        ls = []
+        for e in self.search(search_term, limit, offset):
+            if 'specialty' in e[0]:
+                ls.append(e[0])
+            else:
+                d,v = _dictQuery(d=e[0])
+                ls += [i[0] for i in self._executeQuery(
+                    f"""MATCH (d:{DOC})-[:{WORKS_AT}]->(:{HOS} {d}) RETURN d""",**v)]
+        return [{k:v for k,v in self.getDoctorProfile(d['uuid']).items()
+                 if k != 'reviews'} for d in ls]
+
 
     def getDoctorProfile( self, doctor_uuid: str) -> dict | None:
         """
@@ -333,9 +347,13 @@ class Session:
         Return doctors for a browse-all page with pagination,
         filtering, ratings, review counts, and hospital information.
         """
-        docs =  [i for i,_ in self._executeQuery(f"""MATCH (doctor:Doctor)<-[:Reviews]-(reviews) 
-                           RETURN doctor, avg(toInteger(reviews.rating)) as average_rating
-                           ORDER BY average_rating DESC OFFSET {offset*limit} LIMIT {limit}""")]
+        query = "MATCH (doctor:Doctor)<-[:Reviews]-(reviews)"
+        if specialty != None:
+            query += f"WHERE doctor.specialty = '{specialty}'"
+        query += f"""RETURN doctor, avg(toInteger(reviews.rating)) as average_rating
+                 ORDER BY average_rating DESC OFFSET {offset*limit} LIMIT {limit}"""
+        docs =  [i for i,_ in self._executeQuery(query)]
+                      
         return [{k:v for k,v in self.getDoctorProfile(d['uuid']).items()
                  if k != 'reviews'} for d in docs]
 

@@ -99,13 +99,14 @@ def importScrapedData(max=None):
 
 def makeIndexes():
     def makeIndex(iName,labels, properties):
+        s._executeQuery(f"""DROP INDEX {iName} IF EXISTS""")
         s._executeQuery(f"""
                         CREATE FULLTEXT INDEX {iName} IF NOT EXISTS
                         FOR (n:{'|'.join(labels)})
                         ON EACH[{','.join(['n.'+p for p in properties])}]
                         """)
 
-    makeIndex('names',[DOC,HOS],[NAME])
+    makeIndex('names',[DOC,HOS],[NAME,'specialty'])
 
 if __name__ == '__main__':
     if input('Clean & Import Data? (y/n)').lower() == 'y':
@@ -115,6 +116,7 @@ if __name__ == '__main__':
         cleanup()
         print('Importing scraped data...')
         importScrapedData(max)
+        print('\n'*cpu_count())
         print('Import sucessful.')
 
     print('Creating indexes...')
