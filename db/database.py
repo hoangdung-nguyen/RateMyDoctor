@@ -92,12 +92,17 @@ class Session:
                           blab:str, bdic:dict,
                           rlab:str, rdic=None,
                           createA=True, createB=True,
-                          final='RETURN a,r,b'):
+                          final=None):
         """Creates if not exist nodes a, b, and the relation (a)->[:rlab]->(b)
 
         [a/b][lab/dic] = [label/dictionary] of [first/second] object
         r[lab/dic] = [label/dictionary] of relation
         final = the last operation"""
+        A = alab
+        B = blab
+        R = rlab
+        if final == None: 
+            final = f'RETURN {A},{R},{B}'
 
         query, values = "", {}
         a = ({'name':A,'labels':alab,'d':adic},createA)
@@ -255,12 +260,19 @@ class Session:
     def _tests(self):
         testdoc = {NAME:'Dr. Kimberly Ireland'}
         print('doc rating', s.getDoctorRating(testdoc) == 4.905000000000001)
-        print('doc reviews', len(s.getDoctorReviews(testdoc))==200)
-        print('findNear',len(s.findNear('32162',500))==17)
+        #print('doc reviews', len(s.getDoctorReviews(testdoc))==200)
+        #print('findNear',len(s.findNear('32162',500))==17)
+
         s.requestVerification(testdoc, 'im witawawy hiwm')
         print('verification', s.getVerificationRequests()[0]['reason'] == 'im witawawy hiwm')
         s.approveVerification(self.uname, testdoc)
         #[print(i) for i in s.getDoctorReviews(s.search('kim ireland')[0][0])]
+
+
+    #====================#
+    # Requested Functions#
+    #====================#
+
 
 if __name__ == '__main__':
     s = Session(AUTH)
