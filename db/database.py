@@ -23,6 +23,8 @@ WROTE = 'Wrote'
 REPORTED = 'Reported'
 REVIEWS = 'Reviews'
 RESPONDS_TO = 'Responds_To'
+MIGHT_BE = 'Might_Be'
+IS = 'Is'
 
 USR = 'User'
 DOC = 'Doctor'
@@ -114,7 +116,6 @@ class Session:
                            if rdic == None else
                            f'MERGE ({A})-[{R}:{rlab} {rdic}]->({B})\n{final}'
                    ])
-        print(query)
         return self._executeQuery(query, **values)
 
     def _importDoctor(self, doc, hos):
@@ -178,11 +179,11 @@ class Session:
         """Do not specify user if used to delete own review"""
         if user == None:
             user = self.uname
-        self._abRel(USR, user, REV, review, WROTE, 
+        self._abRel(USR, user, REV, review, WROTE, rdic={},
                     createA=False, createB=False, final='DETACH DELETE b')
 
     def createReport(self, review:dict, reason:str):
-        r = self._abRel(USR, self.uname, REV, {'uuid':review['uuid']}, REPORTED, 
+        self._abRel(USR, self.uname, REV, {'uuid':review['uuid']}, REPORTED, rdic={},
                     createA=False, createB=False, final='DETACH DELETE r')
         report = {BODY:reason, DATE:datetime.now()}
         self._abRel(USR, self.uname, REV, review, REPORTED, rdic=report, createB=False, createA=False)
@@ -192,20 +193,23 @@ class Session:
                                     RETURN u,r,r.body,c """)
         return [{'reporter':r[0],'reason':r[2],'reportedContent':r[3]} for r in result]
 
-    def requestVerification(self):
-        pass
+    def requestVerification(self, doctor, reason):
+        self._abRel(USR, self.uname, DOC, doctor, MIGHT_BE, {BODY:reason}, createA=False, createB=False)
 
     def getVerificationRequests(self):
-        # needs to only be available to admin
-        pass
+        res = self._abRel(USR,{},DOC,{},MIGHT_BE, createA=False, createB=False,
+                          final=f'RETURN a,r,r.{BODY},b')
+        return [{'user':r[0],'reason':r[2],'doctor':r[3]} for r in res]
 
-    def approveVerification(self):
-        # needs to only be available to admin
-        # needs to give a user Doctor permissions & update the relation to IS
+    def approveVerification(self, user, doctor):
+        self._abRel(USR,user,DOC,doctor,MIGHT_BE, rdic={}, createA=False, createB=False,
+                    final=f'DELETE r')
+        self._abRel(USR,user,DOC,doctor,IS, rdic={}, createA=False, createB=False)
         pass
     
-    def denyVerification(self):
-        # needs to only be available to admin
+    def denyVerification(self, user, doctor):
+        self._abRel(USR,user,DOC,doctor,MIGHT_BE, rdic={}, createA=False, createB=False,
+                    final=f'DELETE r')
         pass
 
     def getDoctorRating(self, doctor:dict)->float:
@@ -234,8 +238,10 @@ class Session:
                                   MATCH (d)<-[]-(r:{REV})
                                   RETURN r """,**values)]
 
-    def search(self, search:str, label:str|None=None, fields:dict|None=None):
-        pass
+    def search(self, search:str):
+        """Fuzzyfind, most relevant node at index 0"""
+        return self._executeQuery(f"""CALL db.index.fulltext.queryNodes('names','{search}')
+                                  Yield node return node """)
 
     def findNear(self, zip:str, range:int)->list:
         """Returns a list of hospitals within range of a zip code"""
@@ -248,7 +254,16 @@ class Session:
         print('doc rating', s.getDoctorRating(testdoc) == 4.905000000000001)
         print('doc reviews', len(s.getDoctorReviews(testdoc))==200)
         print('findNear',len(s.findNear('32162',500))==17)
+        s.requestVerification(testdoc, 'im witawawy hiwm')
+        print('verification', s.getVerificationRequests()[0]['reason'] == 'im witawawy hiwm')
+        s.approveVerification(self.uname, testdoc)
+        [print(i) for i in s.search('kim ireland')]
+
 
 if __name__ == '__main__':
     s = Session(AUTH)
+    s._executeQuery(f"""
+                    CREATE FULLTEXT INDEX names IF NOT EXISTS
+                    FOR (n:{DOC}|{HOS}) ON EACH [n.{NAME}]
+                    """) #needs to go to setup
     s._tests()
