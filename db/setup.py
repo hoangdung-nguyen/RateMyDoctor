@@ -3,6 +3,7 @@ from database import *
 import json
 from multiprocessing import cpu_count
 from threading import Thread
+from tqdm import tqdm
 
 # bunch of constants because string typos in keynames would be the death of the database
 NAME = 'name'
@@ -30,8 +31,8 @@ def ignore(obj):
         return False
     hrefs.append(obj['href'])
 
-    if 'United States' not in obj['data']['facilities'][0]['address']\
-            or 'FL' not in obj['data']['facilities'][0]['address']:
+    if 'United States' not in obj['data']['facilities'][0]['address']:
+            #or 'FL' not in obj['data']['facilities'][0]['address']:
         return False
     for i in range(len(obj['reviews'])):
         rev = obj['reviews'][i]
@@ -54,14 +55,16 @@ def deserialize()->list:
 def _import(entries):
     """Formats the data and sends it to the database"""
 
-    for e in entries:
+    for e in tqdm(entries):
         h = dict(e['data']['facilities'][0]) #hospital("facilities")
         addr = h['address'].split(', ')
         if len(addr) == 5:
             street, city, state, _, zip = h['address'].split(', ')
-        else:
+        elif len(addr) == 6:
             street, apt, city, state, _, zip = h['address'].split(', ')
             street = ', '.join([street, apt])
+        else:
+            continue
 
         hos = {NAME:h[NAME],
                 STREET:street,
@@ -80,9 +83,8 @@ def cleanup():
     s.deleteUser('unknown')
     s._executeQuery('MATCH (n) DETACH DELETE n')
 
-def importScrapedData():
+def importScrapedData(max=None):
     s.createUser({'username':'unknown','password':'password'})
-    MAX_DATA = 8
 
     data = deserialize()
     data.sort(key=lambda x: len(x['reviews']))
@@ -90,11 +92,33 @@ def importScrapedData():
     CC = cpu_count()
     threads = []
     for i in range(CC):
-        t = Thread(target=_import, args=(data[i::CC],))
+        t = Thread(target=_import, args=(data[i:max:CC],))
         threads.append(t)
         t.start()
     [t.join for t in threads]
 
+def makeIndexes():
+    def makeIndex(iName,labels, properties):
+        s._executeQuery(f"""DROP INDEX {iName} IF EXISTS""")
+        s._executeQuery(f"""
+                        CREATE FULLTEXT INDEX {iName} IF NOT EXISTS
+                        FOR (n:{'|'.join(labels)})
+                        ON EACH[{','.join(['n.'+p for p in properties])}]
+                        """)
+
+    makeIndex('names',[DOC,HOS],[NAME,'specialty'])
+
 if __name__ == '__main__':
-    cleanup()
-    importScrapedData()
+    if input('Clean & Import Data? (y/n)').lower() == 'y':
+        max = input('Limit (press enter for no limit): ')
+        max = int(max) if max != '' else None
+        print('Deleting existing data..."')
+        cleanup()
+        print('Importing scraped data...')
+        importScrapedData(max)
+        print('\n'*cpu_count())
+        print('Import sucessful.')
+
+    print('Creating indexes...')
+    makeIndexes()
+    print('\nDone')
