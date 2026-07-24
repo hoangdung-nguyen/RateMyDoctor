@@ -205,6 +205,21 @@ class Session:
                            MATCH (comment:{COM} {c}) WITH comment, target
                            MERGE (comment)-[:{RESPONDS_TO}]->(target)""",**v)
 
+    def getComments(self, target_uuid:str):
+        comments = [{'comment':i,'user':j, 'replies':[]} for i,j in self._executeQuery(
+            f"""MATCH (target:{REV}|{COM} {{uuid:'{target_uuid}'}}
+                       )<-[:Responds_To]-(comment) 
+            WITH comment
+            MATCH (u:User)-[:Wrote]->(comment)
+            RETURN comment, u
+            """)]
+        if len(comments) != 0:
+            for c in comments:
+                c['replies'] = self.getComments(c['comment']['uuid'])
+        return comments
+
+
+
 
     def createReport(self, review:dict, reason:str):
         self._abRel(USR, self.uname, REV, {'uuid':review['uuid']}, REPORTED, rdic={},
@@ -306,10 +321,9 @@ class Session:
         print('search',
               s.search('kimb irelnd Ophthalmologist', label=DOC)[0][0]['name']
               == testdoc['name'])
-        rev = s.getDoctorProfile(s.searchDoctors('kimb irelnd Ophthalmologist')[0]['doctor']['uuid'])['reviews'][0]['uuid']
-        s.createComment('aaahhhhhhhhhhaaaaAAAAAAAA',rev)
-        
-
+        #rev = s.getDoctorProfile(s.searchDoctors('kimb irelnd Ophthalmologist')[0]['doctor']['uuid'])['reviews'][0]['uuid']
+        #s.createComment('aaahhhhhhhhhhaaaaAAAAAAAA',rev)
+        #print(s.getComments(rev))
 
         #[print(s.getDoctorProfile(i)['doctor']) for i in s.getDIdsFromHos(s.findNear('32304',300)[0])]
         #print(s.getAllDoctors(5))
