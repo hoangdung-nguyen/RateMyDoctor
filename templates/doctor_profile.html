@@ -9,13 +9,206 @@
         - list of other doctors in the same hospital(?)
         -->
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends "base.html" %}
 
-</body>
-</html>
+{% block title %}
+    {{ doctor.name }} | Rate My Doctor
+{% endblock %}
+
+{% block content %}
+<section class="container py-5">
+
+    <a
+        class="text-decoration-none"
+        href="{{ url_for(
+            'search_results',
+            q=doctor.name
+        ) }}"
+    >
+        <i class="bi bi-arrow-left me-1"></i>
+        Back to search results
+    </a>
+
+    <div class="row g-4 mt-2">
+
+        <!-- Doctor information -->
+        <div class="col-lg-8">
+            <article class="doctor-card">
+
+                <div class="doctor-card-header">
+                    <div class="doctor-avatar">
+                        {{ doctor.name[0] }}
+                    </div>
+
+                    <div>
+                        <h1 class="doctor-name">
+                            {{ doctor.name }}
+                        </h1>
+
+                        <p class="doctor-specialty">
+                            {{ doctor.specialty
+                                |default(
+                                    "Specialty not provided",
+                                    true
+                                ) }}
+                        </p>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <p class="text-secondary mb-1">
+                            Average rating
+                        </p>
+
+                        <p class="fs-3 fw-bold mb-0">
+                            {{ "%.1f"|format(
+                                doctor.average_rating
+                            ) }}
+                            <span class="fs-6 text-secondary">
+                                / 5
+                            </span>
+                        </p>
+                    </div>
+
+                    <div class="col-sm-6">
+                        <p class="text-secondary mb-1">
+                            Patient reviews
+                        </p>
+
+                        <p class="fs-3 fw-bold mb-0">
+                            {{ doctor.review_count }}
+                        </p>
+                    </div>
+                </div>
+
+                {% if hospital %}
+                    <hr>
+
+                    <h2 class="h5 fw-bold">
+                        <i class="bi bi-hospital me-2"></i>
+                        Practice Information
+                    </h2>
+
+                    <p class="fw-bold mb-1">
+                        {{ hospital.name }}
+                    </p>
+
+                    <address class="text-secondary mb-0">
+                        {% if hospital.street %}
+                            {{ hospital.street }}<br>
+                        {% endif %}
+
+                        {{ hospital.city }},
+                        {{ hospital.state }}
+                        {{ hospital.zip }}
+                    </address>
+                {% endif %}
+
+            </article>
+        </div>
+
+        <!-- Action panel -->
+        <div class="col-lg-4">
+            <aside class="doctor-card">
+                <h2 class="h5 fw-bold">
+                    Visited this doctor?
+                </h2>
+
+                <p class="text-secondary">
+                    Share your experience to help other patients.
+                </p>
+
+                <button
+                    class="btn profile-button w-100"
+                    type="button"
+                    disabled
+                >
+                    Write a Review
+                </button>
+
+                <small class="d-block text-secondary mt-2">
+                    Review submission will be connected next.
+                </small>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Reviews -->
+    <section class="mt-5">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="fw-bold">
+                Patient Reviews
+            </h2>
+
+            <span class="text-secondary">
+                {{ doctor.review_count }}
+                review{% if doctor.review_count != 1 %}s{% endif %}
+            </span>
+        </div>
+
+        {% if reviews %}
+            <div class="row g-4 mt-1">
+                {% for review in reviews %}
+                    <div class="col-12">
+                        <article class="doctor-card">
+
+                            <div
+                                class="d-flex flex-wrap
+                                       justify-content-between
+                                       gap-2"
+                            >
+                                <div>
+                                    <span class="fw-bold">
+                                        Patient Review
+                                    </span>
+
+                                    {% if review.date %}
+                                        <p class="text-secondary small mb-0">
+                                            {{ review.date }}
+                                        </p>
+                                    {% endif %}
+                                </div>
+
+                                <div class="fw-bold">
+                                    <i
+                                        class="bi bi-star-fill"
+                                        style="color: #f5b301;"
+                                    ></i>
+
+                                    {{ review.rating|default("N/A") }}
+                                    / 5
+                                </div>
+                            </div>
+
+                            <hr>
+
+                            <p class="mb-0">
+                                {{ review.body
+                                    |default(
+                                        "No written review was provided.",
+                                        true
+                                    ) }}
+                            </p>
+
+                        </article>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-results mt-4">
+                <h3 class="h5">
+                    No reviews yet
+                </h3>
+
+                <p class="text-secondary mb-0">
+                    This doctor does not have any patient reviews.
+                </p>
+            </div>
+        {% endif %}
+    </section>
+
+</section>
+{% endblock %}
