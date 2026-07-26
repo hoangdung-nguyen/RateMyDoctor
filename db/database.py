@@ -400,10 +400,14 @@ class Session:
                  if (haversine(zipcodes[zip], coords, unit=Unit.MILES) <= range)]
         return [h[0] for h in self._executeQuery(f"MATCH (h:Hospital) WHERE h.zip IN {validZips} RETURN h")]
 
-    def getDIdsFromHos(self, hospital:dict):
+    def getDIdsFromHos(self, hospital:dict)->list[str]:
         h,v = _dictQuery(d=hospital)
         return [d[0] for d in self._executeQuery(f'MATCH (d:{DOC})-->(:{HOS} {h})\
                                                         RETURN d.uuid',**v)]
+
+    def findDocNear(self, zip:str, range:int)->list:
+        hids = [self.getDIdsFromHos(h) for h in self.findNear(zip, range)]
+        return [self.getDoctorProfile(h) for h in hids]
 
     def _tests(self):
         testdoc = {NAME:'Dr. Kimberly Ireland'}
