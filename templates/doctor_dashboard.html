@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Doctor Dashboard | Rate My Doctor
+{% endblock %}
+
+{% block content %}
+<section class="container py-5">
+
+    <!-- Heading -->
+    <div class="mb-5">
+        <p class="text-uppercase fw-bold top-label mb-1">
+            Verified Doctor Account
+        </p>
+
+        <h1 class="fw-bold mb-2">
+            Doctor Dashboard
+        </h1>
+
+        <p class="text-secondary mb-0">
+            View your connected doctor profile and patient reviews.
+        </p>
+    </div>
+
+    <!-- Doctor summary -->
+    <div class="doctor-card mb-5">
+        <div class="row align-items-center g-4">
+
+            <div class="col-md-auto">
+                <div
+                    class="rounded-circle bg-light d-flex
+                           align-items-center justify-content-center"
+                    style="width: 110px; height: 110px;"
+                >
+                    <i
+                        class="bi bi-person-badge
+                               text-secondary display-4"
+                    ></i>
+                </div>
+            </div>
+
+            <div class="col">
+                <span class="badge text-bg-primary mb-2">
+                    Verified Doctor
+                </span>
+
+                <h2 class="fw-bold mb-2">
+                    {{ doctor.name }}
+                </h2>
+
+                <p class="fs-5 text-secondary mb-3">
+                    {{
+                        doctor.specialty
+                        |default(
+                            "Specialty not provided",
+                            true
+                        )
+                    }}
+                </p>
+
+                {% if hospital %}
+                    <p class="mb-2">
+                        <i class="bi bi-hospital me-2"></i>
+
+                        {{
+                            hospital.name
+                            |default(
+                                "Hospital information available",
+                                true
+                            )
+                        }}
+                    </p>
+                {% else %}
+                    <p class="text-secondary mb-2">
+                        Hospital information not available
+                    </p>
+                {% endif %}
+
+                <div class="d-flex flex-wrap gap-3 mt-3">
+                    <div>
+                        <strong>
+                            {{ "%.1f"|format(
+                                doctor.average_rating
+                                |default(0, true)
+                            ) }}
+                        </strong>
+
+                        <span class="text-warning">
+                            <i class="bi bi-star-fill"></i>
+                        </span>
+                    </div>
+
+                    <div class="text-secondary">
+                        {{ doctor.review_count }}
+                        review{% if doctor.review_count != 1 %}s{% endif %}
+                    </div>
+                </div>
+
+                <a
+                    class="btn profile-button mt-3"
+                    href="{{ url_for(
+                        'doctor_profile',
+                        doctor_uuid=doctor.uuid
+                    ) }}"
+                >
+                    View Public Profile
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reviews -->
+    <section>
+        <div class="mb-4">
+            <p class="text-uppercase fw-bold top-label mb-1">
+                Patient Feedback
+            </p>
+
+            <h2 class="fw-bold mb-2">
+                Reviews of Your Profile
+            </h2>
+
+            <p class="text-secondary mb-0">
+                These reviews appear on your public doctor profile.
+            </p>
+        </div>
+
+        {% if reviews %}
+            <div class="d-flex flex-column gap-4">
+                {% for review in reviews %}
+                    <article class="doctor-card">
+
+                        <div
+                            class="d-flex flex-column flex-sm-row
+                                   justify-content-between gap-2 mb-3"
+                        >
+                            <div>
+                                <span class="text-warning">
+                                    {% for star in range(1, 6) %}
+                                        {% if star <= review.rating|int %}
+                                            <i class="bi bi-star-fill"></i>
+                                        {% else %}
+                                            <i class="bi bi-star"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                </span>
+
+                                <span class="fw-bold ms-2">
+                                    {{ review.rating }}/5
+                                </span>
+                            </div>
+
+                            {% if review.date %}
+                                <small class="text-secondary">
+                                    {{ review.date }}
+                                </small>
+                            {% endif %}
+                        </div>
+
+                        <p class="mb-3">
+                            {{
+                                review.body
+                                |default(
+                                    "No written review was provided.",
+                                    true
+                                )
+                            }}
+                        </p>
+
+                        <!-- Existing responses -->
+                        {% if review.comments %}
+                            <div class="border-start border-3 ps-3 mb-4">
+                                <h3 class="h6 fw-bold">
+                                    Doctor Response
+                                </h3>
+
+                                {% for response in review.comments %}
+                                    <div class="mb-3">
+                                        <p class="mb-1">
+                                            {{ response.comment.body }}
+                                        </p>
+
+                                        {% if response.comment.date %}
+                                            <small class="text-secondary">
+                                                {{ response.comment.date }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <!-- Response form -->
+                        <form
+                            method="post"
+                            action="{{ url_for(
+                                'respond_to_review',
+                                review_uuid=review.uuid
+                            ) }}"
+                        >
+                            <div class="mb-3">
+                                <label
+                                    class="form-label fw-bold"
+                                    for="response-{{ loop.index }}"
+                                >
+                                    Respond to this review
+                                </label>
+
+                                <textarea
+                                    class="form-control"
+                                    id="response-{{ loop.index }}"
+                                    name="response_body"
+                                    rows="3"
+                                    placeholder="Write a professional response..."
+                                    required
+                                ></textarea>
+                            </div>
+
+                            <button
+                                class="btn profile-button"
+                                type="submit"
+                            >
+                                Submit Response
+                            </button>
+                        </form>
+                    </article>
+                {% endfor %}
+            </div>
+
+        {% else %}
+            <div class="doctor-card text-center">
+                <i
+                    class="bi bi-chat-square-text
+                           display-5 text-secondary"
+                ></i>
+
+                <h3 class="h5 fw-bold mt-3">
+                    No reviews yet
+                </h3>
+
+                <p class="text-secondary mb-0">
+                    Your profile has not received any patient reviews.
+                </p>
+            </div>
+        {% endif %}
+    </section>
+
+</section>
+{% endblock %}

@@ -1,1 +1,8 @@
-__pycache__
+.venv/
+.idea/
+.env
+__pycache__/
+*.pyc
+.DS_Store
+scraping/scraped_data.jsonl
+db/human-readable-scraped.json

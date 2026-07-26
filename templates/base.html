@@ -92,7 +92,28 @@
                             </a>
                         </li>
 
-                        <!-- These can be connected after their Flask routes exist. -->
+                        {% if session.get("role") == "admin" %}
+                            <li class="nav-item">
+                                <a
+                                    class="nav-link"
+                                    href="{{ url_for('admin_dashboard') }}"
+                                >
+                                    Admin
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% if session.get("role") == "doctor" %}
+                            <li class="nav-item">
+                                <a
+                                    class="nav-link"
+                                    href="{{ url_for('doctor_dashboard') }}"
+                                >
+                                    Doctor Dashboard
+                                </a>
+                            </li>
+                        {% endif %}
+
                         <li class="nav-item">
                             <a
                                 class="nav-link disabled"
@@ -137,22 +158,42 @@
                     </form>
 
                     <!-- Authentication placeholders -->
-                    <div class="d-flex gap-2">
-                        <a
-                            class="btn btn-outline-light disabled"
-                            href="#"
-                            aria-disabled="true"
-                        >
-                            Log In
-                        </a>
+                    <div class="d-flex align-items-center gap-2">
+                        {% if session.get("username") %}
+                            <a
+                                class="text-white text-decoration-none"
+                                href="{{ url_for('user_profile') }}"
+                            >
+                                <i class="bi bi-person-circle me-1"></i>
 
-                        <a
-                            class="btn btn-light disabled"
-                            href="#"
-                            aria-disabled="true"
-                        >
-                            Register
-                        </a>
+                                {{ session["username"] }}
+
+                                <span class="badge text-bg-light ms-1">
+                                    {{ session.get("role", "patient") }}
+                                </span>
+                            </a>
+
+                            <a
+                                class="btn btn-outline-light"
+                                href="{{ url_for('logout') }}"
+                            >
+                                Log Out
+                            </a>
+                        {% else %}
+                            <a
+                                class="btn btn-outline-light"
+                                href="{{ url_for('login') }}"
+                            >
+                                Log In
+                            </a>
+
+                            <a
+                                class="btn btn-light"
+                                href="{{ url_for('register') }}"
+                            >
+                                Register
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
