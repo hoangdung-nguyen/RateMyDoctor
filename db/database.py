@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 from datetime import datetime
 from haversine import haversine, Unit
 from neo4j import GraphDatabase
@@ -6,10 +7,16 @@ from random import randint
 from uuid import uuid4 as uuid
 from zipcodes import zipcodes
 
-HOST = 'localhost'
-PORT = '7687'
-AUTH = ('neo4j', 'password') # !!!Needs to only have user creation perms after setup!!!
-URI = f'neo4j://{HOST}:{PORT}'
+HOST = os.environ.get("NEO4J_HOST","localhost")
+
+PORT = os.environ.get("NEO4J_PORT","7687")
+
+URI = os.environ.get("NEO4J_URI",f"neo4j://{HOST}:{PORT}")
+
+AUTH = (
+    os.environ.get("NEO4J_USERNAME","neo4j"),
+    os.environ.get("NEO4J_PASSWORD","password")
+)
 
 A = 'a'
 B = 'b'
@@ -75,8 +82,8 @@ def _giveId(name:str) -> str:
 class Session:
     """An API for interacting with a neo4j database."""
 
-    def __init__(self, login:tuple[str,str]|None=None, host=HOST, port=PORT, driverAuth=AUTH):
-        self.driver = GraphDatabase.driver(f'neo4j://{host}:{port}', auth=driverAuth)
+    def __init__(self, login: tuple[str, str] | None = None, uri=URI, driverAuth=AUTH):
+        self.driver = GraphDatabase.driver(uri, auth=driverAuth)
         self.auth = login
         if login is not None:
             self.login(*login)
@@ -155,22 +162,47 @@ class Session:
         self.auth = None
         self.uname = None
     
-    def createUser(self, login:dict):
+    def createUser(self, login:dict, role: str = "patient") -> bool:
+        valid_roles = {'patient', 'doctor', 'admin'}
+        if role not in valid_roles:
+            return False
+
         try:
             #Create user in the DMBS
             self.driver.execute_query("""\
                     CREATE USER $username
-                    SET PASSWORD '$password' CHANGE NOT REQUIRED""",
+                    SET PASSWORD $password CHANGE NOT REQUIRED""",
                 **login)
-
-        except: #username taken
-            if login['username'] != 'neo4j':
-                return False 
+        except Exception as error:
+            print("createUser error:", error)
+            return False
 
         #Create user as a database object
-        self.driver.execute_query("""\
-                MERGE (:User {username: $username})""",
-                username=login['username'])
+        self.driver.execute_query(
+            "MERGE (u:User {username: $username}) SET u.role = $role, u.is_app_user = true",
+            username=login["username"], role=role
+        )
+        return True
+
+    def getUserRole(self, username: str) -> str | None:
+        results = self._executeQuery(
+            """
+            MATCH (u:User {username: $username})
+            RETURN u.role
+            """,
+            username=username
+        )
+
+        if not results:
+            return None
+
+        role = results[0][0]
+
+        if role is None:
+            return "patient"
+
+        return role
+
 
     def deleteUser(self, username):
         self._executeQuery("""DROP USER $user IF EXISTS""", user=username)
@@ -180,15 +212,27 @@ class Session:
     def createDoctor(self, doctor:dict, hospital:dict):
         self._abRel(DOC, doctor, HOS, hospital, WORKS_AT)
 
-    def createReview(self, review:dict, doctor:dict):
-        """Only allows one review per doctor"""
-        r = self._abRel(USR, self.uname, REV, {}, WROTE,
-                       createA=False, createB=False, final='RETURN b')
-        if len(r) > 0:
-            s.deleteReview(r[0])
+    def createReview(self, review: dict, doctor: dict):
+        """Allow one review per user for each doctor."""
+        existing_reviews = self._executeQuery(
+            f"""
+            MATCH
+                (u:{USR} {{username: $username}})
+                -[:{WROTE}]->
+                (r:{REV})
+                -[:{REVIEWS}]->
+                (d:{DOC} {{uuid: $doctor_uuid}})
+            RETURN r.uuid
+            """,
+            username=self.uname["username"],
+            doctor_uuid=doctor["uuid"]
+        )
 
-        self._abRel(USR, self.uname, REV, giveDate(review), WROTE)
-        self._abRel(REV, review, DOC, doctor, REVIEWS)
+        for result in existing_reviews:
+            self.deleteUserReview(self.uname["username"], result[0])
+
+        self._abRel(USR,self.uname,REV,giveDate(review), WROTE, rdic={}, createA=False)
+        self._abRel(REV,review,DOC,doctor,REVIEWS, rdic={}, createA=False, createB=False)
 
     def deleteReview(self, review, user:dict|None=None):
         """Do not specify user if used to delete own review"""
@@ -196,6 +240,34 @@ class Session:
             user = self.uname
         self._abRel(USR, user, REV, review, WROTE, rdic={},
                     createA=False, createB=False, final='DETACH DELETE b')
+
+    def getUserReviews(self, username: str) -> list[dict]:
+        results = self._executeQuery(
+            f"""
+            MATCH (u:{USR} {{username: $username}})-[:{WROTE}]->(r:{REV})-[:{REVIEWS}]->(d:{DOC})
+            RETURN r, d
+            ORDER BY r.date DESC
+            """, username = username)
+
+        return [{
+                "review": row[0],
+                "doctor": row[1]
+            }
+            for row in results
+        ]
+
+    def deleteUserReview(self,username: str, review_uuid: str
+    ) -> bool:
+        results = self._executeQuery(
+            f"""
+            MATCH (u:{USR} {{username: $username}})-[:{WROTE}]->(r:{REV} {{uuid: $review_uuid}})
+            WITH r DETACH DELETE r RETURN true
+            """,
+            username=username,
+            review_uuid=review_uuid
+        )
+
+        return len(results) > 0
 
     def createComment(self, comment:str, target_uuid:str):
         c = self._abRel(USR, self.uname, COM, giveDate({'body':comment}), 
@@ -218,19 +290,41 @@ class Session:
                 c['replies'] = self.getComments(c['comment']['uuid'])
         return comments
 
+    def canDoctorRespondToReview(self, username: str, review_uuid: str) -> bool:
+        results = self._executeQuery(
+            f"""
+            MATCH (u:{USR} {{username: $username}})
+                  -[:{IS}]->(d:{DOC})
+                  <-[:{REVIEWS}]-(r:{REV} {{uuid: $review_uuid}})
+            RETURN r
+            """,
+            username=username,
+            review_uuid=review_uuid
+        )
 
-
+        return len(results) > 0
 
     def createReport(self, review:dict, reason:str):
         self._abRel(USR, self.uname, REV, {'uuid':review['uuid']}, REPORTED, rdic={},
-                    createA=False, createB=False, final='DETACH DELETE r')
+                    createA=False, createB=False, final='DELETE r')
         report = {BODY:reason, DATE:str(datetime.now())}
-        self._abRel(USR, self.uname, REV, review, REPORTED, rdic=report, createB=False, createA=False)
+        return self._abRel(USR, self.uname, REV, review, REPORTED, rdic=report, createB=False, createA=False)
 
     def getReports(self):
         result = self._executeQuery(f"""MATCH (u:{USR})-[r:{REPORTED}]->(c)
                                     RETURN u,r,r.body,c """)
         return [{'reporter':r[0],'reason':r[2],'reportedContent':r[3]} for r in result]
+
+    def dismissReport(self, username: str, review_uuid: str):
+        self._abRel(USR,{"username": username},REV,{"uuid": review_uuid},REPORTED,createA=False,createB=False,final="DELETE r")
+        return True
+
+    def deleteReviewByUuid(self, review_uuid: str) -> bool:
+        results = self._executeQuery(
+            f"MATCH (r:{REV} {{uuid: $review_uuid}}) WITH r DETACH DELETE r RETURN true",
+            review_uuid=review_uuid
+        )
+        return len(results) > 0
 
     def requestVerification(self, doctor, reason):
         self._abRel(USR, self.uname, DOC, doctor, MIGHT_BE, rdic={BODY:reason}, createA=False, createB=False)
@@ -240,16 +334,17 @@ class Session:
                           final=f'RETURN a,r,r.{BODY},b')
         return [{'user':r[0],'reason':r[2],'doctor':r[3]} for r in res]
 
-    def approveVerification(self, user, doctor):
+    def approveVerification(self, user: dict, doctor: dict):
         self._abRel(USR,user,DOC,doctor,MIGHT_BE, rdic={}, createA=False, createB=False,
                     final=f'DELETE r')
         self._abRel(USR,user,DOC,doctor,IS, rdic={}, createA=False, createB=False)
-        pass
+        #Promote the application accoutn to doctor
+        return self.updateUserRole(user["username"], "doctor")
     
     def denyVerification(self, user, doctor):
         self._abRel(USR,user,DOC,doctor,MIGHT_BE, rdic={}, createA=False, createB=False,
                     final=f'DELETE r')
-        pass
+        return True
 
     def getDoctorRating(self, doctor:dict)->float:
         doc, values = _dictQuery(d=doctor)
@@ -345,8 +440,12 @@ class Session:
                     f"""MATCH (d:{DOC})-[:{WORKS_AT}]->(:{HOS} {d}) RETURN d""",**v)]
         resList = []
         for d in ls:
+            profile = self.getDoctorProfile(d['uuid'])
+
+            if profile is None:
+                continue
             res = {}
-            for k,v in self.getDoctorProfile(d['uuid']).items():
+            for k,v in profile.items():
                 if k != 'reviews':
                     res[k] = v
                 else:
@@ -354,6 +453,68 @@ class Session:
             resList.append(res)
         return resList
 
+    def getAllUsers(self) -> list[dict]:
+        results = self._executeQuery(
+            f"""
+            MATCH (u:{USR}) WHERE u.is_app_user = true
+            OPTIONAL MATCH (u)-[:{WROTE}]->(r:{REV})
+            RETURN u.username, coalesce(u.role, "patient"), count(r)
+            ORDER BY toLower(u.username)
+            """
+        )
+        return [
+            {
+                "username": row[0],
+                "role": row[1],
+                "review_count": row[2]
+            } for row in results
+        ]
+
+    def updateUserRole(
+            self,
+            username: str,
+            role: str
+    ) -> bool:
+        valid_roles = {
+            "patient",
+            "doctor",
+            "admin"
+        }
+
+        if role not in valid_roles:
+            return False
+
+        results = self._executeQuery(
+            f"""
+            MATCH (u:{USR} {{username: $username}})
+            SET u.role = $role
+            RETURN u.role
+            """,
+            username=username,
+            role=role
+        )
+
+        return len(results) > 0
+
+    def getLinkedDoctorProfile(
+            self,
+            username: str
+    ) -> dict | None:
+        results = self._executeQuery(
+            f"""
+            MATCH (u:{USR} {{username: $username}})
+                  -[:{IS}]->(d:{DOC})
+            RETURN d.uuid
+            """,
+            username=username
+        )
+
+        if len(results) == 0:
+            return None
+
+        doctor_uuid = results[0][0]
+
+        return self.getDoctorProfile(doctor_uuid)
 
 
     def getDoctorProfile( self, doctor_uuid: str) -> dict | None:
@@ -368,12 +529,22 @@ class Session:
         Return None when the doctor does not exist.
         """
         try:
-            doc, _, hosp = self._abRel(DOC, {'uuid':doctor_uuid}, HOS, {}, WORKS_AT,
-                                       createA=False, createB=False)[0]
+            results = self._executeQuery(
+                f"""
+                MATCH (d:{DOC} {{uuid: $doctor_uuid}})
+                OPTIONAL MATCH (d)-->(h:{HOS})
+                RETURN d, h
+                """,
+                doctor_uuid=doctor_uuid
+            )
+            if not results:
+                return None
+            doc, hosp = results[0]
             reviews = self.getDoctorReviews(doc)
             rating  = self.getDoctorRating(doc)
             return {'doctor':doc,'hospital':hosp,'average_rating':rating,'reviews':reviews}
-        except:
+        except Exception as error:
+            print("getDoctorProfile error:", error)
             return None
 
     def getAllDoctors( self,
@@ -404,6 +575,9 @@ class Session:
                                                  as specialty
                            RETURN DISTINCT specialty ORDER BY specialty""")]
 
+
+"""
 if __name__ == '__main__':
     s = Session(AUTH)
     s._tests()
+"""

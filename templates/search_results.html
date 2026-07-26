@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Search Results | Rate My Doctor
+{% endblock %}
+
+{% block content %}
+<section class="results-page py-5">
+    <div class="container">
+
+        <!-- Page heading -->
+        <div class="results-heading text-center mb-5">
+            <p class="text-uppercase fw-bold top-label">
+                Doctor Search
+            </p>
+
+            <h1 class="fw-bold">
+                Results for “{{ search_term }}”
+            </h1>
+
+            <p class="text-secondary">
+                Review matching doctors and their patient ratings.
+            </p>
+        </div>
+
+        <!-- Search bar -->
+        <form
+            class="row g-2 justify-content-center mb-5"
+            action="{{ url_for('search_results') }}"
+            method="get"
+        >
+            <div class="col-lg-7 col-md-8">
+                <label
+                    class="visually-hidden"
+                    for="resultsDoctorSearch"
+                >
+                    Search for a doctor
+                </label>
+
+                <input
+                    class="form-control form-control-lg"
+                    id="resultsDoctorSearch"
+                    name="q"
+                    type="search"
+                    value="{{ search_term }}"
+                    placeholder="Enter a doctor's name"
+                    required
+                >
+            </div>
+
+            <div class="col-lg-2 col-md-3 d-grid">
+                <button
+                    class="btn btn-lg search-button"
+                    type="submit"
+                >
+                    <i class="bi bi-search me-1"></i>
+                    Search
+                </button>
+            </div>
+        </form>
+
+        <!-- Results -->
+        {% if doctors %}
+            <div class="row g-4">
+                {% for doctor in doctors %}
+                    <div class="col-lg-4 col-md-6">
+                        <article class="doctor-card h-100">
+
+                            <div class="doctor-card-header">
+                                <div class="doctor-avatar">
+                                    {{ doctor.name[0] }}
+                                </div>
+
+                                <div>
+                                    <h2 class="doctor-name">
+                                        {{ doctor.name }}
+                                    </h2>
+
+                                    <p class="doctor-specialty">
+                                        {{ doctor.specialty
+                                            |default("Specialty not provided") }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="doctor-rating">
+                                <div>
+                                    <span class="rating-number">
+                                        {{ "%.1f"|format(
+                                            doctor.average_rating
+                                        ) }}
+                                    </span>
+
+                                    <span class="rating-total">
+                                        / 5
+                                    </span>
+                                </div>
+
+                                <div class="rating-stars">
+                                    <i class="bi bi-star-fill"></i>
+                                </div>
+                            </div>
+
+                            <p class="review-count">
+                                <i class="bi bi-chat-left-text me-1"></i>
+
+                                {{ doctor.review_count }}
+
+                                review{% if doctor.review_count != 1 %}s{% endif %}
+                            </p>
+
+                            <a
+                                class="btn profile-button w-100"
+                                href="{{ url_for(
+                                        'doctor_profile',
+                                        doctor_uuid=doctor.uuid
+                                      ) }}"
+                            >
+                                View Profile
+                            </a>
+
+                        </article>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-results text-center">
+                <div class="empty-results-icon">
+                    <i class="bi bi-search"></i>
+                </div>
+
+                <h2>No doctors found</h2>
+
+                <p>
+                    Try searching with another doctor name.
+                </p>
+
+                <a
+                    class="btn search-button"
+                    href="{{ url_for('index') }}"
+                >
+                    Return Home
+                </a>
+            </div>
+        {% endif %}
+
+    </div>
+</section>
+{% endblock %}

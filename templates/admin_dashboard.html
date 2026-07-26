@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Admin Dashboard | Rate My Doctor
+{% endblock %}
+
+{% block content %}
+<section class="container py-5">
+
+    <!-- Dashboard heading -->
+    <div class="mb-5">
+        <p class="text-uppercase fw-bold top-label mb-1">
+            Administration
+        </p>
+
+        <h1 class="fw-bold mb-2">
+            Admin Dashboard
+        </h1>
+
+        <p class="text-secondary mb-0">
+            Manage application users and assign patient, doctor,
+            or administrator roles.
+        </p>
+    </div>
+
+    <!-- Account summary -->
+    <div class="row g-4 mb-5">
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="doctor-card h-100">
+                <p class="text-secondary mb-1">
+                    Total Users
+                </p>
+
+                <p class="fs-2 fw-bold mb-0">
+                    {{ users|length }}
+                </p>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="doctor-card h-100">
+                <p class="text-secondary mb-1">
+                    Patients
+                </p>
+
+                <p class="fs-2 fw-bold mb-0">
+                    {{
+                        users
+                        |selectattr(
+                            "role",
+                            "equalto",
+                            "patient"
+                        )
+                        |list
+                        |length
+                    }}
+                </p>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="doctor-card h-100">
+                <p class="text-secondary mb-1">
+                    Doctors
+                </p>
+
+                <p class="fs-2 fw-bold mb-0">
+                    {{
+                        users
+                        |selectattr(
+                            "role",
+                            "equalto",
+                            "doctor"
+                        )
+                        |list
+                        |length
+                    }}
+                </p>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="doctor-card h-100">
+                <p class="text-secondary mb-1">
+                    Administrators
+                </p>
+
+                <p class="fs-2 fw-bold mb-0">
+                    {{
+                        users
+                        |selectattr(
+                            "role",
+                            "equalto",
+                            "admin"
+                        )
+                        |list
+                        |length
+                    }}
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Doctor Verification requests -->
+    <section class="mb-5">
+        <div class="mb-4">
+            <h2 class="fw-bold mb-2">
+                Doctor Verification Requests
+            </h2>
+
+            <p class="text-secondary mb-0">
+                Approve or deny requests from users claiming an existing
+                doctor profile.
+            </p>
+        </div>
+
+        <div class="doctor-card">
+            {% if verification_requests %}
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Doctor</th>
+                                <th>Specialty</th>
+                                <th>Verification Information</th>
+                                <th>Decision</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for verification in verification_requests %}
+                                <tr>
+                                    <td>
+                                        {{ verification.user.username }}
+                                    </td>
+
+                                    <td>
+                                        <a
+                                            href="{{ url_for(
+                                                'doctor_profile',
+                                                doctor_uuid=verification.doctor.uuid
+                                            ) }}"
+                                        >
+                                            {{ verification.doctor.name }}
+                                        </a>
+                                    </td>
+
+                                    <td>
+                                        {{
+                                            verification.doctor.specialty
+                                            |default("Not provided", true)
+                                        }}
+                                    </td>
+
+                                    <td>
+                                        {{ verification.reason }}
+                                    </td>
+
+                                    <td>
+                                        <div class="d-flex gap-2">
+                                            <form
+                                                method="post"
+                                                action="{{ url_for(
+                                                    'approve_verification',
+                                                    username=verification.user.username,
+                                                    doctor_uuid=verification.doctor.uuid
+                                                ) }}"
+                                            >
+                                                <button
+                                                    class="btn btn-success btn-sm"
+                                                    type="submit"
+                                                >
+                                                    Approve
+                                                </button>
+                                            </form>
+
+                                            <form
+                                                method="post"
+                                                action="{{ url_for(
+                                                    'deny_verification',
+                                                    username=verification.user.username,
+                                                    doctor_uuid=verification.doctor.uuid
+                                                ) }}"
+                                            >
+                                                <button
+                                                    class="btn btn-outline-danger btn-sm"
+                                                    type="submit"
+                                                >
+                                                    Deny
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% else %}
+                <p class="text-secondary mb-0">
+                    There are no pending doctor verification requests.
+                </p>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Reported reviews -->
+    <section class="mb-5">
+        <div class="mb-4">
+            <h2 class="fw-bold mb-2">
+                Reported Reviews
+            </h2>
+
+            <p class="text-secondary mb-0">
+                Review reported content and decide whether it should
+                be deleted or dismissed.
+            </p>
+        </div>
+
+        <div class="doctor-card">
+            {% if reports %}
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">
+                                    Reporter
+                                </th>
+
+                                <th scope="col">
+                                    Reason
+                                </th>
+
+                                <th scope="col">
+                                    Review
+                                </th>
+
+                                <th scope="col">
+                                    Rating
+                                </th>
+
+                                <th scope="col">
+                                    Action
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for report in reports %}
+                                <tr>
+                                    <td>
+                                        {{ report.reporter.username }}
+                                    </td>
+
+                                    <td>
+                                        {{ report.reason }}
+                                    </td>
+
+                                    <td>
+                                        {{
+                                            report.reportedContent.body
+                                            |default(
+                                                "No review text available.",
+                                                true
+                                            )
+                                        }}
+                                    </td>
+
+                                    <td>
+                                        {% if report.reportedContent.rating %}
+                                            {{
+                                                report.reportedContent.rating
+                                            }}/5
+                                        {% else %}
+                                            Not available
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        <div
+                                            class="d-flex flex-column
+                                                   flex-lg-row gap-2"
+                                        >
+                                            <!-- Delete the review -->
+                                            <form
+                                                method="post"
+                                                action="{{ url_for(
+                                                    'admin_delete_reported_review',
+                                                    review_uuid=report.reportedContent.uuid
+                                                ) }}"
+                                            >
+                                                <button
+                                                    class="btn btn-danger btn-sm"
+                                                    type="submit"
+                                                >
+                                                    Delete Review
+                                                </button>
+                                            </form>
+
+                                            <!-- Dismiss the report -->
+                                            <form
+                                                method="post"
+                                                action="{{ url_for(
+                                                    'dismiss_report',
+                                                    reporter_username=report.reporter.username,
+                                                    review_uuid=report.reportedContent.uuid
+                                                ) }}"
+                                            >
+                                                <button
+                                                    class="btn
+                                                           btn-outline-secondary
+                                                           btn-sm"
+                                                    type="submit"
+                                                >
+                                                    Dismiss
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% else %}
+                <p class="text-secondary mb-0">
+                    There are no reported reviews.
+                </p>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- User management -->
+    <section>
+        <div class="mb-4">
+            <h2 class="fw-bold mb-2">
+                Manage Users
+            </h2>
+
+            <p class="text-secondary mb-0">
+                Change a user’s application role. Users must log out
+                and log back in before a changed role appears in their
+                session.
+            </p>
+        </div>
+
+        <div class="doctor-card">
+
+            {% if users %}
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+
+                        <thead>
+                            <tr>
+                                <th scope="col">
+                                    Username
+                                </th>
+
+                                <th scope="col">
+                                    Current Role
+                                </th>
+
+                                <th scope="col">
+                                    Reviews
+                                </th>
+
+                                <th scope="col">
+                                    Change Role
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for user in users %}
+                                <tr>
+
+                                    <!-- Username -->
+                                    <td>
+                                        <strong>
+                                            {{ user.username }}
+                                        </strong>
+
+                                        {% if user.username
+                                              == session["username"] %}
+                                            <span
+                                                class="badge
+                                                       text-bg-secondary
+                                                       ms-1"
+                                            >
+                                                You
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Current role -->
+                                    <td>
+                                        {% if user.role == "admin" %}
+                                            <span
+                                                class="badge
+                                                       text-bg-danger"
+                                            >
+                                                Admin
+                                            </span>
+
+                                        {% elif user.role == "doctor" %}
+                                            <span
+                                                class="badge
+                                                       text-bg-primary"
+                                            >
+                                                Doctor
+                                            </span>
+
+                                        {% else %}
+                                            <span
+                                                class="badge
+                                                       text-bg-secondary"
+                                            >
+                                                Patient
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Number of reviews -->
+                                    <td>
+                                        {{ user.review_count }}
+                                    </td>
+
+                                    <!-- Role form -->
+                                    <td>
+                                        {% if user.username
+                                              != session["username"] %}
+
+                                            <form
+                                                class="d-flex
+                                                       flex-column
+                                                       flex-md-row
+                                                       gap-2"
+                                                method="post"
+                                                action="{{ url_for(
+                                                    'update_user_role',
+                                                    username=user.username
+                                                ) }}"
+                                            >
+                                                <label
+                                                    class="visually-hidden"
+                                                    for="role-{{ loop.index }}"
+                                                >
+                                                    Role for
+                                                    {{ user.username }}
+                                                </label>
+
+                                                <select
+                                                    class="form-select"
+                                                    id="role-{{ loop.index }}"
+                                                    name="role"
+                                                    required
+                                                >
+                                                    <option
+                                                        value="patient"
+                                                        {% if user.role == "patient" %}
+                                                            selected
+                                                        {% endif %}
+                                                    >
+                                                        Patient
+                                                    </option>
+
+                                                    {% if user.role == "doctor" %}
+                                                        <option value="doctor" selected>
+                                                            Doctor
+                                                        </option>
+                                                    {% endif %}
+
+                                                    <option
+                                                        value="admin"
+                                                        {% if user.role== "admin" %}
+                                                            selected
+                                                        {% endif %}
+                                                    >
+                                                        Admin
+                                                    </option>
+                                                </select>
+
+                                                <button
+                                                    class="btn
+                                                           profile-button"
+                                                    type="submit"
+                                                >
+                                                    Update
+                                                </button>
+                                            </form>
+
+                                        {% else %}
+                                            <span
+                                                class="text-secondary small"
+                                            >
+                                                You cannot change your
+                                                own role.
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+
+                    </table>
+                </div>
+
+            {% else %}
+                <div class="empty-results">
+                    <h2 class="h5">
+                        No users found
+                    </h2>
+
+                    <p class="text-secondary mb-0">
+                        Application users will appear here after they
+                        register.
+                    </p>
+                </div>
+            {% endif %}
+
+        </div>
+    </section>
+
+</section>
+{% endblock %}

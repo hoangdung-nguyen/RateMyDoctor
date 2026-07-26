@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Find a Doctor | Rate My Doctor
+{% endblock %}
+
+{% block content %}
+<section class="container py-5" id="doctor-search">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 text-center">
+            <p class="text-uppercase fw-bold top-label">
+                Patient-powered healthcare reviews
+            </p>
+
+            <h1 class="display-4 fw-bold">
+                Find a doctor you can trust
+            </h1>
+
+            <p class="lead text-secondary mt-3">
+                Search for doctors and read reviews from other patients.
+            </p>
+
+            <form
+                class="row g-2 mt-4"
+                action="{{ url_for('search_results') }}"
+                method="get"
+            >
+                <div class="col-md-9">
+                    <label
+                        class="visually-hidden"
+                        for="homeDoctorSearch"
+                    >
+                        Doctor name
+                    </label>
+
+                    <input
+                        class="form-control form-control-lg"
+                        id="homeDoctorSearch"
+                        name="q"
+                        type="search"
+                        placeholder="Enter a doctor's name"
+                        required
+                    >
+                </div>
+
+                <div class="col-md-3 d-grid">
+                    <button
+                        class="btn btn-primary btn-lg search-button"
+                        type="submit"
+                    >
+                        <i class="bi bi-search me-1"></i>
+                        Search
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}
