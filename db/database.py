@@ -5,7 +5,7 @@ from haversine import haversine, Unit
 from neo4j import GraphDatabase
 from random import randint
 from uuid import uuid4 as uuid
-from zipcodes import zipcodes
+from db.zipcodes import zipcodes    #throws error on NixOS from app.py when not prepended with db
 
 HOST = os.environ.get("NEO4J_HOST","localhost")
 
