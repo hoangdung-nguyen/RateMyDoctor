@@ -78,9 +78,15 @@ def _import(entries):
 
         s._importDoctor(doc, hos)
 
+def cleanUsers():
+    unames = [u[0] for u in s._executeQuery('SHOW USERS')]
+    for u in unames:
+        s.deleteUser(u)
+
 def cleanup():
     #input('Waiting for input...')
     s.deleteUser('unknown')
+    s.deleteUser('admin_test')
     s._executeQuery('MATCH (n) DETACH DELETE n')
 
 def importScrapedData(max=None):
@@ -119,6 +125,9 @@ if __name__ == '__main__':
         print('\n'*cpu_count())
         print('Import sucessful.')
 
+    cleanUsers()
+    s.createUser({'user':'admin_test', 'password':'password'})
+    s.createUser({'user':'doctor_test', 'password':'password'})
     print('Creating indexes...')
     makeIndexes()
     print('\nDone')
