@@ -867,6 +867,40 @@ def respond_to_review(review_uuid):
 
     return redirect(url_for("doctor_dashboard"))
 
+
+@app.get("/hospital-near-me")
+def nearby_hospitals():
+    zip_code = request.args.get("zip_code", "").strip()
+    radius_text = request.args.get("radius", "25")
+
+    hospitals = []
+    error = None
+    radius = 25
+
+    if zip_code:
+        if len(zip_code) != 5 or not zip_code.isdigit():
+            error = "Enter a valid five-digit zip code."
+        else:
+            try:
+                radius = int(radius_text)
+
+                if radius <= 0:
+                    raise ValueError
+            except ValueError:
+                error = "Enter a valid search radius."
+        if error is None:
+            database = get_database_session()
+            try:
+                hospitals = database.findNear(zip_code, radius)
+            except KeyError:
+                error = "The ZIP code was not found."
+            except Exception as exception:
+                print("fineNear error:", exception)
+                error = ("The hospital search could not be completed.")
+
+    return render_template("hospitals_near_me.html", hospitals = hospitals, zip_code = zip_code, radius = radius, error = error, search_performed = bool(zip_code))
+
+
 if __name__ == "__main__":
     app.run(
         host="127.0.0.1",
