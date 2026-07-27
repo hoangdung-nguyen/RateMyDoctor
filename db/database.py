@@ -413,7 +413,6 @@ class Session:
         testdoc = {NAME:'Dr. Kimberly Ireland'}
         print('doc rating', s.getDoctorRating(testdoc) == 4.905000000000001)
 
-        s.createUser({'username':'neo4j','password':'password'})
         s.requestVerification(testdoc, 'im witawawy hiwm')
         print('verification', s.getVerificationRequests()[0]['reason'] == 'im witawawy hiwm')
         s.approveVerification(self.uname, testdoc)
@@ -428,6 +427,7 @@ class Session:
         #print(s.getAllDoctors(5))
         #print(s.getSpecialties())
         #[print(i) for i in s.searchDoctors('plastic', 5)]
+        s.getDoctorProfile(s.search('ireland')[0][0]['uuid'])
 
     #====================#
     # Requested Functions#
@@ -537,16 +537,21 @@ class Session:
                 f"""
                 MATCH (d:{DOC} {{uuid: $doctor_uuid}})
                 OPTIONAL MATCH (d)-->(h:{HOS})
-                RETURN d, h
+                Optional Match (d)<-[i:Is]-(u)
+                RETURN d, h, i, u
                 """,
                 doctor_uuid=doctor_uuid
             )
             if not results:
                 return None
-            doc, hosp = results[0]
+            try:
+                doc, hosp, _, user = results[0]
+            except:
+                doc, hosp = results[0]
+                user = ''
             reviews = self.getDoctorReviews(doc)
             rating  = self.getDoctorRating(doc)
-            return {'doctor':doc,'hospital':hosp,'average_rating':rating,'reviews':reviews}
+            return {'doctor':doc,'hospital':hosp,'average_rating':rating,'reviews':reviews, 'username':user}
         except Exception as error:
             print("getDoctorProfile error:", error)
             return None
@@ -580,8 +585,6 @@ class Session:
                            RETURN DISTINCT specialty ORDER BY specialty""")]
 
 
-"""
 if __name__ == '__main__':
     s = Session(AUTH)
     s._tests()
-"""
