@@ -21,7 +21,7 @@
     <div class="mb-4">
         <a
             class="text-decoration-none"
-            href="{{ url_for('search_results') }}"
+            href="javascript:history.back()"
         >
             <i class="bi bi-arrow-left me-1"></i>
             Back to Search
@@ -48,6 +48,10 @@
 
             <!-- Doctor information -->
             <div class="col">
+                <p class="text-uppercase fw-bold top-label mb-1">
+                    Verified Doctor Account
+                </p>
+
                 <p class="text-uppercase fw-bold top-label mb-1">
                     Doctor Profile
                 </p>
@@ -115,7 +119,7 @@
     </div>
 
     <!-- Claim-profile card -->
-    {% if session.get("role") == "patient" %}
+    {% if not verified and session.get("role") == "patient" %}
         <section class="doctor-card mt-4">
             <div class="row align-items-start g-3">
                 <div class="col-md-auto">
@@ -214,7 +218,7 @@
                 </h2>
             </div>
 
-            {% if session.get("role") == "patient" %}
+            {% if session.get("role") in ["patient", "doctor"] and not is_own_profile %}
                 <a
                     class="btn profile-button"
                     href="{{ url_for(
@@ -281,7 +285,7 @@
                                 }}
                             </p>
                         <!-- Report review -->
-                        {% if session.get("role") == "patient" %}
+                        {% if session.get("role") == "patient" or is_own_profile%}
                             <details class="mt-3">
                                 <summary class="text-danger">
                                     Report this review
@@ -347,6 +351,41 @@
                                 </div>
                             {% endif %}
 
+                            <!-- Response form -->
+                            {% if is_own_profile %}
+                                <form
+                                    method="post"
+                                    action="{{ url_for(
+                                        'respond_to_review',
+                                        review_uuid=review.uuid
+                                    ) }}"
+                                >
+                                    <div class="mb-3">
+                                        <label
+                                            class="form-label fw-bold"
+                                            for="response-{{ loop.index }}"
+                                        >
+                                            Respond to this review
+                                        </label>
+
+                                        <textarea
+                                            class="form-control"
+                                            id="response-{{ loop.index }}"
+                                            name="response_body"
+                                            rows="3"
+                                            placeholder="Write a professional response..."
+                                            required
+                                        ></textarea>
+                                    </div>
+
+                                    <button
+                                        class="btn profile-button"
+                                        type="submit"
+                                    >
+                                        Submit Response
+                                    </button>
+                                </form>
+                            {% endif %}
                             </article>
                 {% endfor %}
             </div>

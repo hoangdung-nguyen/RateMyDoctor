@@ -81,7 +81,8 @@ def _import(entries):
 def cleanUsers():
     unames = [u[0] for u in s._executeQuery('SHOW USERS')]
     for u in unames:
-        s.deleteUser(u)
+        if u != 'neo4j':
+            s.deleteUser(u)
 
 def cleanup():
     #input('Waiting for input...')
@@ -126,8 +127,8 @@ if __name__ == '__main__':
         print('Import sucessful.')
 
     cleanUsers()
-    s.createUser({'username':'admin_test', 'password':'password'})
-    s.createUser({'username':'doctor_test', 'password':'password'})
+    s.createUser({'username':'admin_test', 'password':'password'}, 'admin')
+    s.createUser({'username':'doctor_test', 'password':'password'}, 'doctor')
     print('Creating indexes...')
     makeIndexes()
     print('\nDone')
