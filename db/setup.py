@@ -127,7 +127,7 @@ if __name__ == '__main__':
         print('Import sucessful.')
 
     cleanUsers()
-    s.createUser({'username':'admin_test', 'password':'password'})
+    s.createUser({'username':'admin_test', 'password':'password'},'admin')
     s.createUser({'username':'doctor_test', 'password':'password'})
     print('Creating indexes...')
     makeIndexes()
