@@ -597,6 +597,7 @@ def update_user_role(username):
     try:
         updated = database.updateUserRole(
             username,
+            session.get("role"),
             new_role
         )
 

@@ -354,6 +354,15 @@ class Session:
         self._abRel(USR,user,DOC,doctor,MIGHT_BE, rdic={}, createA=False, createB=False,
                     final=f'DELETE r')
         return True
+
+    def removeVerification(self, user):
+        self._executeQuery(f"""
+            MATCH (u:{USR})-[r:{IS}]->(d:{DOC})
+            WHERE u.username = $username
+            DELETE r
+        """, username=user['username']
+        )
+        return True
     
     def isDoctorVerified(self, doctor):
         result = self._executeQuery(f"""
@@ -495,7 +504,8 @@ class Session:
     def updateUserRole(
             self,
             username: str,
-            role: str
+            old_role: str,
+            new_role: str
     ) -> bool:
         valid_roles = {
             "patient",
@@ -503,7 +513,7 @@ class Session:
             "admin"
         }
 
-        if role not in valid_roles:
+        if new_role not in valid_roles:
             return False
 
         results = self._executeQuery(
@@ -513,8 +523,11 @@ class Session:
             RETURN u.role
             """,
             username=username,
-            role=role
+            role=new_role
         )
+
+        if old_role == "doctor" and new_role == "user":
+            self.removeVerification({"username":username})
 
         return len(results) > 0
 
