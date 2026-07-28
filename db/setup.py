@@ -81,7 +81,8 @@ def _import(entries):
 def cleanUsers():
     unames = [u[0] for u in s._executeQuery('SHOW USERS')]
     for u in unames:
-        s.deleteUser(u)
+        if u != 'neo4j':
+            s.deleteUser(u)
 
 def cleanup():
     #input('Waiting for input...')
