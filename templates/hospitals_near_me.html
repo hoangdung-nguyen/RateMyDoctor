@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Find Hospitals | Rate My Doctor
+{% endblock %}
+
+{% block content %}
+<section class="container py-5">
+    <div class="mb-4">
+        <p class="text-uppercase fw-bold top-label mb-1">
+            Search by location
+        </p>
+
+        <h1 class="fw-bold">
+            Find Hospitals Near You
+        </h1>
+
+        <p class="text-secondary">
+            Enter a ZIP code and select a search radius.
+        </p>
+    </div>
+
+    <form
+        action="{{ url_for('nearby_hospitals') }}"
+        method="get"
+        class="doctor-card mb-5"
+    >
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label
+                    class="form-label"
+                    for="zipCode"
+                >
+                    ZIP code
+                </label>
+
+                <input
+                    class="form-control"
+                    id="zipCode"
+                    name="zip_code"
+                    type="text"
+                    maxlength="5"
+                    pattern="[0-9]{5}"
+                    value="{{ zip_code }}"
+                    placeholder="32304"
+                    required
+                >
+            </div>
+
+            <div class="col-md-3">
+                <label
+                    class="form-label"
+                    for="radius"
+                >
+                    Search radius
+                </label>
+
+                <select
+                    class="form-select"
+                    id="radius"
+                    name="radius"
+                >
+                    {% for option in [5, 10, 25, 50, 100] %}
+                        <option
+                            value="{{ option }}"
+                            {% if radius == option %}selected{% endif %}
+                        >
+                            {{ option }} miles
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3 d-grid">
+                <button
+                    class="btn btn-primary"
+                    type="submit"
+                >
+                    Search
+                </button>
+            </div>
+        </div>
+    </form>
+
+    {% if error %}
+        <div class="alert alert-danger">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if search_performed and not error %}
+        <h2 class="h4 mb-3">
+            Nearby Hospitals
+        </h2>
+
+        {% if hospitals %}
+            <div class="d-flex flex-column gap-3">
+                {% for hospital in hospitals %}
+                    <article class="doctor-card">
+                        <h3 class="h5 fw-bold">
+                            <i class="bi bi-hospital me-2"></i>
+
+                            {{ hospital.get(
+                                "name",
+                                "Hospital"
+                            ) }}
+                        </h3>
+
+                        <p class="text-secondary mb-0">
+                            ZIP code:
+                            {{ hospital.get(
+                                "zip",
+                                "Not available"
+                            ) }}
+                        </p>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="doctor-card">
+                <p class="mb-0">
+                    No hospitals were found within
+                    {{ radius }} miles of {{ zip_code }}.
+                </p>
+            </div>
+        {% endif %}
+    {% endif %}
+</section>
+{% endblock %}

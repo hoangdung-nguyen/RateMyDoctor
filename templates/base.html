@@ -92,6 +92,15 @@
                             </a>
                         </li>
 
+                        <li class="nav-item">
+                            <a
+                                class="nav-link"
+                                href="{{ url_for('nearby_hospitals') }}"
+                            >
+                                Find Hospitals
+                            </a>
+                        </li>
+
                         {% if session.get("role") == "admin" %}
                             <li class="nav-item">
                                 <a
@@ -114,15 +123,6 @@
                             </li>
                         {% endif %}
 
-                        <li class="nav-item">
-                            <a
-                                class="nav-link disabled"
-                                href="#"
-                                aria-disabled="true"
-                            >
-                                About
-                            </a>
-                        </li>
                     </ul>
 
                     <!-- Navbar search -->
@@ -260,6 +260,11 @@
                         <li>
                             <a href="{{ url_for('index') }}#doctor-search">
                                 Find a Doctor
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ url_for('nearby_hospitals') }}">
+                                Find Hospitals
                             </a>
                         </li>
                     </ul>
