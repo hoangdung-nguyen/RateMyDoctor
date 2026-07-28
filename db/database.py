@@ -338,8 +338,14 @@ class Session:
         return [{'user':r[0],'reason':r[2],'doctor':r[3]} for r in res]
 
     def approveVerification(self, user: dict, doctor: dict):
-        self._abRel(USR,user,DOC,doctor,MIGHT_BE, rdic={}, createA=False, createB=False,
-                    final=f'DELETE r')
+        # self._abRel(USR,user,DOC,doctor,MIGHT_BE, rdic={}, createA=False, createB=False,
+        #             final=f'DELETE r')
+        self._executeQuery(f"""
+            MATCH (u:{USR})-[r:{MIGHT_BE}]->(d:{DOC})
+            WHERE d.uuid = $doctor_uuid
+            DELETE r
+        """, doctor_uuid=doctor["uuid"]
+        )
         self._abRel(USR,user,DOC,doctor,IS, rdic={}, createA=False, createB=False)
         #Promote the application accoutn to doctor
         return self.updateUserRole(user["username"], "doctor")
@@ -348,7 +354,16 @@ class Session:
         self._abRel(USR,user,DOC,doctor,MIGHT_BE, rdic={}, createA=False, createB=False,
                     final=f'DELETE r')
         return True
+    
+    def isDoctorVerified(self, doctor):
+        result = self._executeQuery(f"""
+            MATCH (u:{USR})-[:{IS}]->(d:{DOC})
+            WHERE d.uuid = $doctor_uuid
+            RETURN u
+        """, doctor_uuid=doctor["uuid"])
 
+        return len(result) > 0
+    
     def getDoctorRating(self, doctor:dict)->float:
         doc, values = _dictQuery(d=doctor)
         return self._executeQuery(f"""MATCH (:{DOC} {doc})<-[]-(r:{REV})
