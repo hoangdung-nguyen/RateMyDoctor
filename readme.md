@@ -1,3 +1,16 @@
+# Instructions
+>[!warning]
+> Running db/setup.py will delete all nodes and users on an existing database.
+> I could not specify a sub-database to run commands on since we used the free version of neo4j.
+ - run db/setup.py
+    - import data
+ - run app.py
+    - admin  = {user:'admin_test', pass:'password'}
+    - doctor = {user:'doctor_test', pass:'password'}
+        - The doctor will not be a doctor by default, must be promoted by an admin after requesting verification
+
+---
+
 # RateMyDoctor
 - Proposed features:
 	- Rate Hospitals

@@ -3,7 +3,6 @@ from database import *
 import json
 from multiprocessing import cpu_count
 from threading import Thread
-from tqdm import tqdm
 
 # bunch of constants because string typos in keynames would be the death of the database
 NAME = 'name'
@@ -55,7 +54,7 @@ def deserialize()->list:
 def _import(entries):
     """Formats the data and sends it to the database"""
 
-    for e in tqdm(entries):
+    for e in entries:
         h = dict(e['data']['facilities'][0]) #hospital("facilities")
         addr = h['address'].split(', ')
         if len(addr) == 5:
@@ -123,7 +122,6 @@ if __name__ == '__main__':
         cleanup()
         print('Importing scraped data...')
         importScrapedData(max)
-        print('\n'*cpu_count())
         print('Import sucessful.')
 
     cleanUsers()
