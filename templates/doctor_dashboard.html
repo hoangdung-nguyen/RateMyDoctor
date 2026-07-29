@@ -166,6 +166,47 @@
                                 )
                             }}
                         </p>
+                        <!-- Report review -->
+                        <details class="mt-3">
+                            <summary class="text-danger">
+                                Report this review
+                            </summary>
+
+                            <form
+                                class="mt-3"
+                                method="post"
+                                action="{{ url_for(
+                                'report_review',
+                                doctor_uuid=doctor.uuid,
+                                review_uuid=review.uuid
+                            ) }}"
+                            >
+                                <div class="mb-3">
+                                    <label
+                                        class="form-label"
+                                        for="report-reason-{{ loop.index }}"
+                                    >
+                                        Reason for reporting
+                                    </label>
+
+                                    <textarea
+                                        class="form-control"
+                                        id="report-reason-{{ loop.index }}"
+                                        name="reason"
+                                        rows="3"
+                                        placeholder="Explain why this review should be examined."
+                                        required
+                                    ></textarea>
+                                </div>
+
+                                <button
+                                    class="btn btn-outline-danger btn-sm"
+                                    type="submit"
+                                >
+                                    Submit Report
+                                </button>
+                            </form>
+                        </details>
 
                         <!-- Existing responses -->
                         {% if review.comments %}

@@ -98,6 +98,11 @@ def doctor_profile(doctor_uuid):
         doctor_uuid
     )
 
+    current_doctor = database.getLinkedDoctorProfile(session["username"]) if "username" in session else None
+    is_own_profile = current_doctor is not None and current_doctor["doctor"]["uuid"] == doctor_uuid
+
+    verified = database.isDoctorVerified({'uuid': doctor_uuid})
+
     if profile is None:
         abort(404)
 
@@ -126,7 +131,9 @@ def doctor_profile(doctor_uuid):
         "doctor_profile.html",
         doctor=doctor,
         hospital=profile.get("hospital"),
-        reviews=reviews
+        reviews=reviews,
+        is_own_profile=is_own_profile,
+        verified=verified
     )
 
 @app.route("/login", methods = ["GET", "POST"])
@@ -215,8 +222,21 @@ def submit_review(doctor_uuid):
         return redirect(url_for("login"))
 
     database = get_database_session()
-    profile = database.getDoctorProfile(doctor_uuid)
+    
+    current_doctor = database.getLinkedDoctorProfile(session["username"])
 
+    if current_doctor is not None and current_doctor["doctor"]["uuid"] == doctor_uuid:
+        flash(
+            "Your account is not connected to a doctor profile.",
+            "warning"
+        )
+        return render_template(
+            "submit_review.html",
+            doctor=doctor
+        )
+    
+    profile = database.getDoctorProfile(doctor_uuid)
+    
     if profile is None:
         abort(404)
 
@@ -577,6 +597,7 @@ def update_user_role(username):
     try:
         updated = database.updateUserRole(
             username,
+            session.get("role"),
             new_role
         )
 
