@@ -2,6 +2,10 @@
 >[!warning]
 > Running db/setup.py will delete all nodes and users on an existing database.
 > I could not specify a sub-database to run commands on since we used the free version of neo4j.
+ - export environment variables:
+    - NEO4J_URI
+    - NEO4J_USERNAME
+    - NEO4J_PASSWORD
  - run db/setup.py
     - import data
  - run app.py
